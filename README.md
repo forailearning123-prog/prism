@@ -48,7 +48,7 @@ A morning briefing can proactively provide:
 
 - Revenue decreased 8%
 - Primary reason: North India sales dropped due to reduced distributor ordering frequency
-- Expected impact: ₹1.8 crore revenue reduction over next 45 days
+- Expected impact: ₹1.8 crore (18 million) revenue reduction over next 45 days
 - Recommendation: Offer Distributor Incentive Plan A
 - Probability of recovery: 81%
 
@@ -57,7 +57,7 @@ A morning briefing can proactively provide:
 Prism is offered in three editions:
 
 1. **Community Edition** - Free, self-hosted/local for developers and small teams
-2. **Professional Edition** - Subscription for SMEs in India (~₹2,500-₹5,000/month)
+2. **Professional Edition** - Subscription for SMEs in India, ranging from ₹2,500-₹5,000/month based on usage
 3. **Enterprise Edition** - Custom pricing with SSO, RBAC, audit, advanced governance, and deployment on customer infrastructure
 
 Professional pricing is presented in INR for India; equivalent pricing is localized by market.
