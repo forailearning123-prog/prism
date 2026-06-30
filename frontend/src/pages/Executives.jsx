@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react'
 import api from '../services/api'
 import ExecutiveCard from '../components/ExecutiveCard'
+import LoadingState from '../components/LoadingState'
+import ErrorState from '../components/ErrorState'
 
 export default function Executives() {
   const [executives, setExecutives] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     api.get('/api/v1/executives')
       .then(res => setExecutives(res.data))
-      .catch(console.error)
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
 
@@ -23,11 +26,9 @@ export default function Executives() {
       </div>
 
       {loading ? (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="card animate-pulse h-52 bg-gray-900" />
-          ))}
-        </div>
+        <LoadingState count={6} height="h-52" />
+      ) : error ? (
+        <ErrorState message={error} />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {executives.map(exec => (

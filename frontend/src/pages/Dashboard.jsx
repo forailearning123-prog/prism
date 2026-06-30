@@ -5,6 +5,8 @@ import api from '../services/api'
 import ExecutiveCard from '../components/ExecutiveCard'
 import InsightCard from '../components/InsightCard'
 import { TrendingUp, AlertTriangle, Users, Activity } from 'lucide-react'
+import LoadingState from '../components/LoadingState'
+import ErrorState from '../components/ErrorState'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -12,6 +14,7 @@ export default function Dashboard() {
   const [executives, setExecutives] = useState([])
   const [insights, setInsights] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -22,7 +25,7 @@ export default function Dashboard() {
         setExecutives(execRes.data)
         setInsights(insRes.data)
       })
-      .catch(console.error)
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
 
@@ -62,11 +65,9 @@ export default function Dashboard() {
           </button>
         </div>
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="card animate-pulse h-48 bg-gray-900" />
-            ))}
-          </div>
+          <LoadingState count={3} height="h-48" />
+        ) : error ? (
+          <ErrorState message={error} />
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {insights.slice(0, 3).map(insight => (
@@ -88,11 +89,9 @@ export default function Dashboard() {
           </button>
         </div>
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="card animate-pulse h-48 bg-gray-900" />
-            ))}
-          </div>
+          <LoadingState count={3} height="h-48" />
+        ) : error ? (
+          <ErrorState message={error} />
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {executives.slice(0, 3).map(exec => (

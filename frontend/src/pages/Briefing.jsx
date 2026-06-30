@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import api from '../services/api'
 import { Calendar, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
+import LoadingState from '../components/LoadingState'
+import ErrorState from '../components/ErrorState'
 
 const healthColors = {
   Healthy: { bar: 'bg-green-500', text: 'text-green-400', bg: 'bg-green-950/30 border-green-800' },
@@ -30,17 +32,11 @@ export default function Briefing() {
   }, [])
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="card animate-pulse h-32 bg-gray-900" />
-        ))}
-      </div>
-    )
+    return <LoadingState count={4} height="h-32" />
   }
 
   if (error) {
-    return <p className="text-red-400">Failed to load briefing: {error}</p>
+    return <ErrorState message={`Failed to load briefing: ${error}`} />
   }
 
   const health = healthColors[briefing.overall_health] || healthColors.Caution
