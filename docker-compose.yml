@@ -4,7 +4,7 @@ services:
     container_name: prism-backend
     restart: unless-stopped
     environment:
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set — run: openssl rand -hex 32}
       - DEBUG=${DEBUG:-false}
       - ALLOWED_ORIGINS=["http://localhost", "http://localhost:80", "${FRONTEND_URL:-http://localhost}"]
       - DATABASE_URL=sqlite+aiosqlite:///./data/prism.db

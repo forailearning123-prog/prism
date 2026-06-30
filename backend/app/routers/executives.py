@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth import get_current_user
 from app.models import User
 from app.schemas import ExecutiveBase
@@ -79,5 +79,4 @@ async def get_executive(executive_id: str, current_user: User = Depends(get_curr
     for exec_ in EXECUTIVES:
         if exec_.id == executive_id:
             return exec_
-    from fastapi import HTTPException, status
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Executive not found")

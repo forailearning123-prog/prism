@@ -10,12 +10,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('prism_token')
     if (token) {
-      api.defaults.headers.common['Authorization'] = 'Bearer ' + token
       api.get('/api/v1/auth/me')
         .then(res => setUser(res.data))
         .catch(() => {
           localStorage.removeItem('prism_token')
-          delete api.defaults.headers.common['Authorization']
         })
         .finally(() => setLoading(false))
     } else {
@@ -32,7 +30,6 @@ export function AuthProvider({ children }) {
     })
     const { access_token } = res.data
     localStorage.setItem('prism_token', access_token)
-    api.defaults.headers.common['Authorization'] = 'Bearer ' + access_token
     const meRes = await api.get('/api/v1/auth/me')
     setUser(meRes.data)
   }
@@ -44,7 +41,6 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('prism_token')
-    delete api.defaults.headers.common['Authorization']
     setUser(null)
   }
 

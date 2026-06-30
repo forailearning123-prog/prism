@@ -5,9 +5,13 @@ const api = axios.create({
   timeout: 15000,
 })
 
-const token = localStorage.getItem('prism_token')
-if (token) {
-  api.defaults.headers.common['Authorization'] = 'Bearer ' + token
-}
+// Attach token on every request so refreshed tokens are always picked up
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('prism_token')
+  if (token) {
+    config.headers['Authorization'] = 'Bearer ' + token
+  }
+  return config
+})
 
 export default api
