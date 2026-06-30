@@ -43,4 +43,4 @@ Navigate to the **Environment Variables** section in the Coolify resource dashbo
 
 ## Updating the Code
 To update your application, simply push your changes to your Git repository branch.
-You can configure Coolify to trigger automatic deployments upon new commits via webhooks in the **Webhooks** section of your Coolify resource.
+You can configure Coolify to trigger automatic deployments upon new commits via webhooks in the **Webhooks** section of your Coolify resource.# Updated CD Workflow  
