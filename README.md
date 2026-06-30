@@ -48,7 +48,7 @@ A morning briefing can proactively provide:
 
 - Revenue decreased 8%
 - Primary reason: North India sales dropped due to reduced distributor ordering frequency
-- Expected impact: ₹1.8 Cr revenue reduction over next 45 days
+- Expected impact: ₹1.8 crore revenue reduction over next 45 days
 - Recommendation: Offer Distributor Incentive Plan A
 - Probability of recovery: 81%
 
