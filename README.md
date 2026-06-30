@@ -33,7 +33,7 @@ Prism sells **business decisions**—not dashboards, reports, or KPIs.
 
 ## Executive AI Counterparts
 
-Every company gets AI executives available 24×7:
+Every company gets AI executives available 24x7:
 
 - AI CFO: financial health, cash flow, forecasts, profitability, cost optimization, investment suggestions
 - AI COO: operations, supply chain, manufacturing, inventory, vendor performance
@@ -56,9 +56,9 @@ A morning briefing can proactively provide:
 
 Prism is offered in three editions:
 
-1. **Community Edition** – Free, self-hosted/local for developers and small teams
-2. **Professional Edition** – Subscription for SMEs (~₹2,500–₹5,000/month)
-3. **Enterprise Edition** – Custom pricing with SSO, RBAC, audit, advanced governance, and deployment on customer infrastructure
+1. **Community Edition** - Free, self-hosted/local for developers and small teams
+2. **Professional Edition** - Subscription for SMEs (~₹2,500-₹5,000/month)
+3. **Enterprise Edition** - Custom pricing with SSO, RBAC, audit, advanced governance, and deployment on customer infrastructure
 
 ## Deployment & Architecture
 
