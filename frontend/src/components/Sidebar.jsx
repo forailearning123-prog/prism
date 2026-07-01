@@ -9,6 +9,7 @@ import {
   Database,
   Layers,
   BrainCircuit,
+  TrendingUp,
 } from 'lucide-react'
 
 const nav = [
@@ -18,6 +19,7 @@ const nav = [
   { to: '/executives', icon: Users, label: 'AI Executives' },
   { to: '/connections', icon: Database, label: 'Data Sources' },
   { to: '/semantic-models', icon: Layers, label: 'Semantic Models' },
+  { to: '/forecasting', icon: TrendingUp, label: 'Forecasting' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 

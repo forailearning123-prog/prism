@@ -1021,3 +1021,233 @@ class ReportDefinition(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
     )
+
+
+class ForecastStatus(str, enum.Enum):
+    draft = "draft"
+    generating = "generating"
+    ready = "ready"
+    failed = "failed"
+    archived = "archived"
+
+
+class ForecastHorizon(str, enum.Enum):
+    daily = "daily"
+    weekly = "weekly"
+    monthly = "monthly"
+    quarterly = "quarterly"
+    yearly = "yearly"
+
+
+class RiskLevel(str, enum.Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    critical = "critical"
+
+
+class ScenarioStatus(str, enum.Enum):
+    draft = "draft"
+    running = "running"
+    complete = "complete"
+    failed = "failed"
+
+
+class ForecastDefinition(Base):
+    __tablename__ = "forecast_definitions"
+    __table_args__ = (
+        Index("ix_forecast_definitions_owner_status", "owner_id", "status"),
+        Index("ix_forecast_definitions_status_horizon", "status", "horizon"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    business_domain: Mapped[str] = mapped_column(String(255), default="")
+    semantic_model_id: Mapped[int | None] = mapped_column(ForeignKey("semantic_models.id"), nullable=True, index=True)
+    target_metric: Mapped[str] = mapped_column(String(255), index=True)
+    horizon: Mapped[ForecastHorizon] = mapped_column(Enum(ForecastHorizon), default=ForecastHorizon.monthly, index=True)
+    confidence_level: Mapped[float] = mapped_column(Float, default=0.95)
+    variables: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[ForecastStatus] = mapped_column(Enum(ForecastStatus), default=ForecastStatus.draft, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    last_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    model_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    results: Mapped[list["ForecastResult"]] = relationship(back_populates="forecast", cascade="all, delete-orphan")
+    scenarios: Mapped[list["ScenarioPlan"]] = relationship(back_populates="forecast", cascade="all, delete-orphan")
+    driver_analyses: Mapped[list["DriverAnalysis"]] = relationship(back_populates="forecast", cascade="all, delete-orphan")
+    risk_assessments: Mapped[list["RiskAssessment"]] = relationship(back_populates="forecast", cascade="all, delete-orphan")
+    versions: Mapped[list["ForecastVersion"]] = relationship(back_populates="forecast", cascade="all, delete-orphan")
+    alerts: Mapped[list["PredictionAlert"]] = relationship(back_populates="forecast", cascade="all, delete-orphan")
+
+
+class ForecastResult(Base):
+    __tablename__ = "forecast_results"
+    __table_args__ = (Index("ix_forecast_results_forecast_version", "forecast_id", "version_number"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecast_definitions.id"), index=True)
+    version_number: Mapped[int] = mapped_column(Integer, default=1)
+    historical_data: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    forecast_data: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    confidence_upper: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    confidence_lower: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    accuracy_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trend_direction: Mapped[TrendDirection] = mapped_column(Enum(TrendDirection), default=TrendDirection.neutral)
+    executive_summary: Mapped[str] = mapped_column(Text, default="")
+    key_factors: Mapped[list[str]] = mapped_column(JSON, default=list)
+    assumptions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    recommendations: Mapped[list[str]] = mapped_column(JSON, default=list)
+    model_used: Mapped[str] = mapped_column(String(100), default="")
+    generated_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    forecast: Mapped["ForecastDefinition"] = relationship(back_populates="results")
+
+
+class ScenarioPlan(Base):
+    __tablename__ = "scenario_plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    forecast_id: Mapped[int | None] = mapped_column(ForeignKey("forecast_definitions.id"), nullable=True, index=True)
+    variables: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[ScenarioStatus] = mapped_column(Enum(ScenarioStatus), default=ScenarioStatus.draft, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    estimated_impact: Mapped[dict] = mapped_column(JSON, default=dict)
+    result_summary: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    forecast: Mapped["ForecastDefinition | None"] = relationship(back_populates="scenarios")
+    what_if_variables: Mapped[list["WhatIfVariable"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
+
+
+class WhatIfVariable(Base):
+    __tablename__ = "what_if_variables"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario_plans.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    variable_type: Mapped[str] = mapped_column(String(100), default="percentage")
+    base_value: Mapped[float] = mapped_column(Float, default=0.0)
+    adjusted_value: Mapped[float] = mapped_column(Float, default=0.0)
+    unit: Mapped[str] = mapped_column(String(50), default="%")
+    impact_direction: Mapped[str] = mapped_column(String(20), default="neutral")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    scenario: Mapped["ScenarioPlan"] = relationship(back_populates="what_if_variables")
+
+
+class DriverAnalysis(Base):
+    __tablename__ = "driver_analyses"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecast_definitions.id"), index=True)
+    target_kpi: Mapped[str] = mapped_column(String(255), index=True)
+    drivers: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    analysis_summary: Mapped[str] = mapped_column(Text, default="")
+    generated_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    forecast: Mapped["ForecastDefinition"] = relationship(back_populates="driver_analyses")
+
+
+class RiskAssessment(Base):
+    __tablename__ = "risk_assessments"
+    __table_args__ = (
+        Index("ix_risk_assessments_owner_level", "owner_id", "risk_level"),
+        Index("ix_risk_assessments_type_active", "risk_type", "is_active"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    risk_type: Mapped[str] = mapped_column(String(100), index=True)
+    forecast_id: Mapped[int | None] = mapped_column(ForeignKey("forecast_definitions.id"), nullable=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    risk_level: Mapped[RiskLevel] = mapped_column(Enum(RiskLevel), default=RiskLevel.medium, index=True)
+    probability: Mapped[float] = mapped_column(Float, default=0.5)
+    business_impact: Mapped[str] = mapped_column(Text, default="")
+    recommended_actions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    forecast: Mapped["ForecastDefinition | None"] = relationship(back_populates="risk_assessments")
+
+
+class OpportunityInsight(Base):
+    __tablename__ = "opportunity_insights"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    opportunity_type: Mapped[str] = mapped_column(String(100), index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    expected_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence_score: Mapped[float] = mapped_column(Float, default=0.75)
+    description: Mapped[str] = mapped_column(Text, default="")
+    recommended_actions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    priority_rank: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+
+class ForecastVersion(Base):
+    __tablename__ = "forecast_versions"
+    __table_args__ = (UniqueConstraint("forecast_id", "version_number", name="uq_forecast_version_number"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecast_definitions.id"), index=True)
+    version_number: Mapped[int] = mapped_column(Integer, default=1)
+    result_id: Mapped[int | None] = mapped_column(ForeignKey("forecast_results.id"), nullable=True, index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    forecast: Mapped["ForecastDefinition"] = relationship(back_populates="versions")
+    result: Mapped["ForecastResult | None"] = relationship()
+
+
+class PredictionAlert(Base):
+    __tablename__ = "prediction_alerts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecast_definitions.id"), index=True)
+    alert_type: Mapped[str] = mapped_column(String(100), index=True)
+    severity: Mapped[RiskLevel] = mapped_column(Enum(RiskLevel), default=RiskLevel.medium, index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text, default="")
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    forecast: Mapped["ForecastDefinition"] = relationship(back_populates="alerts")
+
+
+class RecommendationHistory(Base):
+    __tablename__ = "recommendation_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    forecast_id: Mapped[int | None] = mapped_column(ForeignKey("forecast_definitions.id"), nullable=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    business_objective: Mapped[str] = mapped_column(Text, default="")
+    expected_impact: Mapped[str] = mapped_column(Text, default="")
+    confidence: Mapped[float] = mapped_column(Float, default=0.75)
+    dependencies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    next_steps: Mapped[list[str]] = mapped_column(JSON, default=list)
+    source_type: Mapped[str] = mapped_column(String(100), default="forecast")
+    is_actioned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
