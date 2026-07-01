@@ -7,6 +7,9 @@ from app.ai.llm_client import chat_completion
 
 logger = logging.getLogger(__name__)
 
+# Reports require more tokens than regular analysis responses due to multi-section narrative.
+_REPORT_MAX_TOKENS = 3000
+
 _REPORT_SYSTEM = """You are a senior business analyst generating a formal business report.
 Respond with valid JSON:
 {
@@ -45,7 +48,7 @@ Produce a comprehensive report with narrative, KPIs, and actionable recommendati
     ]
 
     try:
-        raw = await chat_completion(messages, max_tokens=3000)
+        raw = await chat_completion(messages, max_tokens=_REPORT_MAX_TOKENS)
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1]

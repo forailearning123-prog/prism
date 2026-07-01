@@ -33,6 +33,10 @@ from app.models import (
 router = APIRouter(prefix="/analyst", tags=["AI Analyst"])
 logger = logging.getLogger(__name__)
 
+# Maximum number of prior messages included in the LLM context window per request.
+# Keeping this bounded prevents token overflows on long conversations.
+_MAX_HISTORY_MESSAGES = 20
+
 
 class ConversationCreate(BaseModel):
     title: str = Field(default="New Conversation", max_length=500)
@@ -205,7 +209,7 @@ async def _build_history(conversation_id: int, db: AsyncSession) -> list[dict]:
         select(AnalystMessage)
         .where(AnalystMessage.conversation_id == conversation_id)
         .order_by(AnalystMessage.created_at.asc())
-        .limit(20)
+        .limit(_MAX_HISTORY_MESSAGES)
     )
     messages = result.scalars().all()
     return [{"role": message.role.value, "content": message.content} for message in messages]

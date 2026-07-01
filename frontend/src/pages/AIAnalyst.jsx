@@ -278,7 +278,7 @@ export default function AIAnalyst() {
             </button>
             <div className="min-w-0">
               <h1 className="text-sm font-semibold text-white truncate">
-                {activeConversation?.title || `AI Business Analyst${user?.email ? ` · ${user.email}` : ''}`}
+                {activeConversation?.title || 'AI Business Analyst'}
               </h1>
               {activeConversation ? (
                 <p className="text-xs text-gray-500">{activeConversation.message_count} messages</p>

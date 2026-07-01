@@ -15,6 +15,8 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+_DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+
 _DEMO_SYSTEM_PROMPT = """You are an expert AI Business Analyst.
 Respond with structured JSON exactly matching the schema provided."""
 
@@ -45,7 +47,7 @@ async def chat_completion_stream(
 
 
 async def _openai_chat(messages: list[dict], temperature: float, max_tokens: int) -> str:
-    base_url = settings.openai_base_url or "https://api.openai.com/v1"
+    base_url = settings.openai_base_url or _DEFAULT_OPENAI_BASE_URL
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
             f"{base_url}/chat/completions",
@@ -68,7 +70,7 @@ async def _openai_chat(messages: list[dict], temperature: float, max_tokens: int
 async def _openai_stream(
     messages: list[dict], temperature: float, max_tokens: int
 ) -> AsyncIterator[str]:
-    base_url = settings.openai_base_url or "https://api.openai.com/v1"
+    base_url = settings.openai_base_url or _DEFAULT_OPENAI_BASE_URL
     async with httpx.AsyncClient(timeout=60) as client:
         async with client.stream(
             "POST",

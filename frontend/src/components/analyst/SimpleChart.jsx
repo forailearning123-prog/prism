@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useId } from 'react'
 
 function formatValue(v) {
   const value = Number(v) || 0
@@ -7,12 +7,12 @@ function formatValue(v) {
   return value % 1 === 0 ? String(value) : value.toFixed(1)
 }
 
-function gradientId(title) {
-  return `grad-${String(title || 'chart').replace(/[^a-zA-Z0-9_-]/g, '-')}`
-}
-
 function LineChart({ data, xKey, yKey, title, color = '#818cf8' }) {
   if (!data || data.length === 0) return null
+
+  // useId guarantees a unique ID even when multiple charts with the same title render simultaneously
+  const uid = useId()
+  const fillId = `grad-${uid.replace(/:/g, '')}`
 
   const width = 400
   const height = 160
@@ -24,7 +24,6 @@ function LineChart({ data, xKey, yKey, title, color = '#818cf8' }) {
   const plotW = width - padding.left - padding.right
   const plotH = height - padding.top - padding.bottom
   const lastIndex = Math.max(data.length - 1, 1)
-  const fillId = gradientId(title)
 
   const toX = (i) => padding.left + (i / lastIndex) * plotW
   const toY = (v) => padding.top + plotH - ((v - minVal) / range) * plotH

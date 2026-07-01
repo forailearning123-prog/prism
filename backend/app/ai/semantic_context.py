@@ -67,10 +67,9 @@ async def build_semantic_context(
     )
     measures = measures_result.scalars().all()
     for measure in measures:
-        terms = [measure.display_name.lower()]
-        if measure.category:
-            terms.append(measure.category.lower())
-        if not q_lower or any(term in q_lower for term in terms if term):
+        # Build a deduplicated list of non-empty search terms for this measure
+        terms = [t for t in [measure.display_name.lower(), measure.category.lower()] if t]
+        if not q_lower or any(term in q_lower for term in terms):
             context["relevant_measures"].append(
                 {
                     "name": measure.display_name,
