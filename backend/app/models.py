@@ -1251,3 +1251,508 @@ class RecommendationHistory(Base):
     source_type: Mapped[str] = mapped_column(String(100), default="forecast")
     is_actioned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+
+# ──────────────────────────────────────────────
+# Monitoring & Automation Module (Sprint 7)
+# ──────────────────────────────────────────────
+
+class MonitorFrequency(str, enum.Enum):
+    realtime = "realtime"
+    every_minute = "every_minute"
+    every_5_minutes = "every_5_minutes"
+    every_15_minutes = "every_15_minutes"
+    every_hour = "every_hour"
+    every_6_hours = "every_6_hours"
+    daily = "daily"
+    weekly = "weekly"
+    monthly = "monthly"
+
+
+class MonitorSeverity(str, enum.Enum):
+    critical = "critical"
+    high = "high"
+    medium = "medium"
+    low = "low"
+    informational = "informational"
+
+
+class MonitorStatus(str, enum.Enum):
+    active = "active"
+    inactive = "inactive"
+    archived = "archived"
+
+
+class RuleType(str, enum.Enum):
+    threshold = "threshold"
+    trend = "trend"
+    percentage_change = "percentage_change"
+    comparison = "comparison"
+    multi_condition = "multi_condition"
+    time_based = "time_based"
+    composite = "composite"
+
+
+class RuleOperator(str, enum.Enum):
+    lt = "lt"
+    lte = "lte"
+    gt = "gt"
+    gte = "gte"
+    eq = "eq"
+    neq = "neq"
+    between = "between"
+    outside = "outside"
+
+
+class AlertStatus(str, enum.Enum):
+    open = "open"
+    acknowledged = "acknowledged"
+    resolved = "resolved"
+    dismissed = "dismissed"
+
+
+class WorkflowTriggerType(str, enum.Enum):
+    alert = "alert"
+    schedule = "schedule"
+    anomaly = "anomaly"
+    sla_breach = "sla_breach"
+    webhook = "webhook"
+
+
+class WorkflowStepType(str, enum.Enum):
+    send_notification = "send_notification"
+    generate_report = "generate_report"
+    refresh_dashboard = "refresh_dashboard"
+    refresh_semantic_model = "refresh_semantic_model"
+    trigger_webhook = "trigger_webhook"
+    create_task = "create_task"
+    invoke_analyst = "invoke_analyst"
+    execute_workflow = "execute_workflow"
+    wait = "wait"
+
+
+class EscalationLevel(str, enum.Enum):
+    first = "first"
+    second = "second"
+    third = "third"
+    executive = "executive"
+
+
+class NotificationChannelType(str, enum.Enum):
+    in_app = "in_app"
+    email = "email"
+    slack = "slack"
+    teams = "teams"
+    webhook = "webhook"
+
+
+class AnomalyCategory(str, enum.Enum):
+    revenue = "revenue"
+    cost = "cost"
+    sales = "sales"
+    inventory = "inventory"
+    workforce = "workforce"
+    operational = "operational"
+    financial = "financial"
+
+
+# ── Monitor ──
+
+class Monitor(Base):
+    __tablename__ = "monitors"
+    __table_args__ = (Index("ix_monitors_owner_status", "owner_id", "status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    semantic_model_id: Mapped[int | None] = mapped_column(ForeignKey("semantic_models.id"), nullable=True, index=True)
+    kpi_id: Mapped[int | None] = mapped_column(ForeignKey("kpis.id"), nullable=True, index=True)
+    measure_name: Mapped[str] = mapped_column(String(255), default="")
+    frequency: Mapped[MonitorFrequency] = mapped_column(Enum(MonitorFrequency), default=MonitorFrequency.daily)
+    severity: Mapped[MonitorSeverity] = mapped_column(Enum(MonitorSeverity), default=MonitorSeverity.medium)
+    status: Mapped[MonitorStatus] = mapped_column(Enum(MonitorStatus), default=MonitorStatus.inactive, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    business_owner: Mapped[str] = mapped_column(String(255), default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    template_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    evaluation_count: Mapped[int] = mapped_column(Integer, default=0)
+    alert_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    owner: Mapped["User"] = relationship()
+    rules: Mapped[list["MonitorRule"]] = relationship(back_populates="monitor", cascade="all, delete-orphan")
+    alerts: Mapped[list["AlertEvent"]] = relationship(back_populates="monitor", cascade="all, delete-orphan")
+
+
+# ── Monitor Rule ──
+
+class MonitorRule(Base):
+    __tablename__ = "monitor_rules"
+    __table_args__ = (Index("ix_monitor_rules_monitor", "monitor_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
+    rule_type: Mapped[RuleType] = mapped_column(Enum(RuleType), default=RuleType.threshold)
+    operator: Mapped[RuleOperator] = mapped_column(Enum(RuleOperator), default=RuleOperator.gt)
+    threshold_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold_high: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold_low: Mapped[float | None] = mapped_column(Float, nullable=True)
+    percentage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    comparison_monitor_id: Mapped[int | None] = mapped_column(ForeignKey("monitors.id"), nullable=True)
+    trend_window: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="Number of periods for trend detection")
+    trend_direction: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    time_field: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    time_value: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    time_unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    condition_logic: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="Nested condition tree for multi-condition/composite rules")
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    monitor: Mapped["Monitor"] = relationship(back_populates="rules")
+
+
+# ── Alert Event ──
+
+class AlertEvent(Base):
+    __tablename__ = "alert_events"
+    __table_args__ = (
+        Index("ix_alert_events_monitor_status", "monitor_id", "status"),
+        Index("ix_alert_events_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id"), index=True)
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey("monitor_rules.id"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text, default="")
+    severity: Mapped[MonitorSeverity] = mapped_column(Enum(MonitorSeverity), default=MonitorSeverity.medium, index=True)
+    status: Mapped[AlertStatus] = mapped_column(Enum(AlertStatus), default=AlertStatus.open, index=True)
+    source: Mapped[str] = mapped_column(String(100), default="rule")
+    kpi_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    anomaly_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    anomaly_category: Mapped[AnomalyCategory | None] = mapped_column(Enum(AnomalyCategory), nullable=True)
+    possible_causes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    suggested_actions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    ai_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    root_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    acknowledged_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolution_notes: Mapped[str] = mapped_column(Text, default="")
+    escalation_level: Mapped[EscalationLevel | None] = mapped_column(Enum(EscalationLevel), nullable=True)
+    escalation_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    monitor: Mapped["Monitor"] = relationship(back_populates="alerts")
+    comments: Mapped[list["AlertComment"]] = relationship(back_populates="alert", cascade="all, delete-orphan")
+
+
+class AlertComment(Base):
+    __tablename__ = "alert_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    alert_id: Mapped[int] = mapped_column(ForeignKey("alert_events.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    alert: Mapped["AlertEvent"] = relationship(back_populates="comments")
+    user: Mapped["User"] = relationship()
+
+
+# ── Notification Configuration ──
+
+class NotificationConfig(Base):
+    __tablename__ = "notification_configs"
+    __table_args__ = (UniqueConstraint("user_id", "channel", name="uq_user_notification_channel"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    channel: Mapped[NotificationChannelType] = mapped_column(Enum(NotificationChannelType), default=NotificationChannelType.in_app)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
+    min_severity: Mapped[MonitorSeverity] = mapped_column(Enum(MonitorSeverity), default=MonitorSeverity.medium)
+    quiet_hours_start: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    quiet_hours_end: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    user: Mapped["User"] = relationship()
+
+
+class NotificationDelivery(Base):
+    __tablename__ = "notification_deliveries"
+    __table_args__ = (Index("ix_notification_deliveries_alert_user", "alert_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    alert_id: Mapped[int] = mapped_column(ForeignKey("alert_events.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    channel: Mapped[NotificationChannelType] = mapped_column(Enum(NotificationChannelType))
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+# ── Anomaly Event ──
+
+class AnomalyEvent(Base):
+    __tablename__ = "anomaly_events"
+    __table_args__ = (Index("ix_anomaly_events_category_created", "category", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    monitor_id: Mapped[int | None] = mapped_column(ForeignKey("monitors.id"), nullable=True, index=True)
+    semantic_model_id: Mapped[int | None] = mapped_column(ForeignKey("semantic_models.id"), nullable=True, index=True)
+    category: Mapped[AnomalyCategory] = mapped_column(Enum(AnomalyCategory), index=True)
+    severity: Mapped[MonitorSeverity] = mapped_column(Enum(MonitorSeverity), default=MonitorSeverity.medium)
+    metric_name: Mapped[str] = mapped_column(String(255))
+    metric_value: Mapped[float] = mapped_column(Float)
+    expected_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    deviation: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    anomaly_score: Mapped[float] = mapped_column(Float, default=0.0)
+    possible_causes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    suggested_actions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    affected_kpis: Mapped[list[str]] = mapped_column(JSON, default=list)
+    ai_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_resolved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# ── Workflow Definition ──
+
+class WorkflowDefinition(Base):
+    __tablename__ = "workflow_definitions"
+    __table_args__ = (Index("ix_workflow_definitions_owner", "owner_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    trigger_type: Mapped[WorkflowTriggerType] = mapped_column(Enum(WorkflowTriggerType), default=WorkflowTriggerType.alert)
+    trigger_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    template_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    owner: Mapped["User"] = relationship()
+    steps: Mapped[list["WorkflowStep"]] = relationship(back_populates="workflow", cascade="all, delete-orphan", order_by="WorkflowStep.order")
+    executions: Mapped[list["WorkflowExecution"]] = relationship(back_populates="workflow", cascade="all, delete-orphan")
+
+
+class WorkflowStep(Base):
+    __tablename__ = "workflow_steps"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    workflow_id: Mapped[int] = mapped_column(ForeignKey("workflow_definitions.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
+    step_type: Mapped[WorkflowStepType] = mapped_column(Enum(WorkflowStepType))
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
+    condition: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=300)
+    is_parallel: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    workflow: Mapped["WorkflowDefinition"] = relationship(back_populates="steps")
+
+
+class WorkflowExecution(Base):
+    __tablename__ = "workflow_executions"
+    __table_args__ = (Index("ix_workflow_executions_status", "status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    workflow_id: Mapped[int] = mapped_column(ForeignKey("workflow_definitions.id"), index=True)
+    alert_id: Mapped[int | None] = mapped_column(ForeignKey("alert_events.id"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(50), default="pending", index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    workflow: Mapped["WorkflowDefinition"] = relationship(back_populates="executions")
+    step_results: Mapped[list["WorkflowStepResult"]] = relationship(back_populates="execution", cascade="all, delete-orphan")
+
+
+class WorkflowStepResult(Base):
+    __tablename__ = "workflow_step_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    execution_id: Mapped[int] = mapped_column(ForeignKey("workflow_executions.id"), index=True)
+    step_id: Mapped[int] = mapped_column(ForeignKey("workflow_steps.id"), index=True)
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    execution: Mapped["WorkflowExecution"] = relationship(back_populates="step_results")
+
+
+# ── Escalation Policy ──
+
+class EscalationPolicy(Base):
+    __tablename__ = "escalation_policies"
+    __table_args__ = (Index("ix_escalation_policies_monitor", "monitor_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    monitor_id: Mapped[int | None] = mapped_column(ForeignKey("monitors.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    steps: Mapped[list["EscalationStep"]] = relationship(back_populates="policy", cascade="all, delete-orphan", order_by="EscalationStep.level_order")
+
+
+class EscalationStep(Base):
+    __tablename__ = "escalation_steps"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    policy_id: Mapped[int] = mapped_column(ForeignKey("escalation_policies.id"), index=True)
+    level_order: Mapped[int] = mapped_column(Integer, default=0)
+    level: Mapped[EscalationLevel] = mapped_column(Enum(EscalationLevel), default=EscalationLevel.first)
+    notify_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    notify_role: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    delay_minutes: Mapped[int] = mapped_column(Integer, default=15)
+    notify_channels: Mapped[list[str]] = mapped_column(JSON, default=list)
+    message_template: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    policy: Mapped["EscalationPolicy"] = relationship(back_populates="steps")
+
+
+# ── Scheduled Insight ──
+
+class ScheduledInsight(Base):
+    __tablename__ = "scheduled_insights"
+    __table_args__ = (Index("ix_scheduled_insights_owner", "owner_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="")
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    schedule_cron: Mapped[str] = mapped_column(String(100))
+    timezone: Mapped[str] = mapped_column(String(100), default="UTC")
+    format: Mapped[str] = mapped_column(String(50), default="email")
+    recipients: Mapped[list[str]] = mapped_column(JSON, default=list)
+    included_kpis: Mapped[list[str]] = mapped_column(JSON, default=list)
+    monitor_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    last_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    owner: Mapped["User"] = relationship()
+    deliveries: Mapped[list["InsightDeliveryHistory"]] = relationship(back_populates="insight", cascade="all, delete-orphan")
+
+
+class InsightDeliveryHistory(Base):
+    __tablename__ = "insight_delivery_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    insight_id: Mapped[int] = mapped_column(ForeignKey("scheduled_insights.id"), index=True)
+    status: Mapped[str] = mapped_column(String(50), default="sent")
+    recipient_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    insight: Mapped["ScheduledInsight"] = relationship(back_populates="deliveries")
+
+
+# ── SLA Metric ──
+
+class SLAMetric(Base):
+    __tablename__ = "sla_metrics"
+    __table_args__ = (Index("ix_sla_metrics_name_status", "name", "status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    target_value: Mapped[float] = mapped_column(Float)
+    target_unit: Mapped[str] = mapped_column(String(50), default="hours")
+    current_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default="compliant", index=True)
+    breach_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    measurement_period: Mapped[str] = mapped_column(String(50), default="daily")
+    last_measured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    breaches: Mapped[int] = mapped_column(Integer, default=0)
+    trend: Mapped[str] = mapped_column(String(20), default="neutral")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    owner: Mapped["User"] = relationship()
+    breach_history: Mapped[list["SLABreachRecord"]] = relationship(back_populates="sla_metric", cascade="all, delete-orphan")
+
+
+class SLABreachRecord(Base):
+    __tablename__ = "sla_breach_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    sla_id: Mapped[int] = mapped_column(ForeignKey("sla_metrics.id"), index=True)
+    value_at_breach: Mapped[float] = mapped_column(Float)
+    threshold: Mapped[float] = mapped_column(Float)
+    deviation: Mapped[float] = mapped_column(Float)
+    breached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+    sla_metric: Mapped["SLAMetric"] = relationship(back_populates="breach_history")
+
+
+# ── Business Health Score ──
+
+class BusinessHealthScore(Base):
+    __tablename__ = "business_health_scores"
+    __table_args__ = (Index("ix_business_health_scores_created", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    overall_score: Mapped[float] = mapped_column(Float, default=0.0)
+    kpi_performance: Mapped[float] = mapped_column(Float, default=0.0)
+    forecast_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    active_risks: Mapped[float] = mapped_column(Float, default=0.0)
+    open_alerts: Mapped[float] = mapped_column(Float, default=0.0)
+    data_quality: Mapped[float] = mapped_column(Float, default=0.0)
+    operational_efficiency: Mapped[float] = mapped_column(Float, default=0.0)
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+
+# ── Audit Record ──
+
+class AuditRecord(Base):
+    __tablename__ = "audit_records"
+    __table_args__ = (
+        Index("ix_audit_records_entity_action", "entity_type", "action"),
+        Index("ix_audit_records_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    entity_type: Mapped[str] = mapped_column(String(100), index=True)
+    entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(100), index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    changes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    user: Mapped["User | None"] = relationship()
