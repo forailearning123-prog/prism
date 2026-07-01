@@ -9,6 +9,7 @@ import Executives from './pages/Executives'
 import Settings from './pages/Settings'
 import Connections from './pages/Connections'
 import DataSourceDetails from './pages/DataSourceDetails'
+import SemanticModels from './pages/SemanticModels'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/executives" element={<Executives />} />
             <Route path="/connections" element={<Connections />} />
             <Route path="/connections/:sourceId" element={<DataSourceDetails />} />
+            <Route path="/semantic-models" element={<SemanticModels />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>

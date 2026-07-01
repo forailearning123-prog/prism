@@ -6,7 +6,9 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -51,6 +53,13 @@ class PermissionRole(str, enum.Enum):
     viewer = "viewer"
 
 
+class AppUserRole(str, enum.Enum):
+    admin = "admin"
+    data_architect = "data_architect"
+    business_analyst = "business_analyst"
+    viewer = "viewer"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -61,6 +70,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    role: Mapped[AppUserRole] = mapped_column(Enum(AppUserRole), default=AppUserRole.admin, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -180,3 +190,359 @@ class DataSourcePermission(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     data_source: Mapped["DataSource"] = relationship(back_populates="permissions")
+
+
+class SemanticModelStatus(str, enum.Enum):
+    draft = "draft"
+    published = "published"
+    archived = "archived"
+
+
+class RelationshipType(str, enum.Enum):
+    one_to_one = "one_to_one"
+    one_to_many = "one_to_many"
+    many_to_one = "many_to_one"
+    many_to_many = "many_to_many"
+
+
+class ValidationSeverity(str, enum.Enum):
+    error = "error"
+    warning = "warning"
+
+
+class TrendDirection(str, enum.Enum):
+    up = "up"
+    down = "down"
+    neutral = "neutral"
+
+
+class SemanticModel(Base):
+    __tablename__ = "semantic_models"
+    __table_args__ = (
+        Index("ix_semantic_models_owner_status", "owner_id", "status"),
+        Index("ix_semantic_models_updated_at", "updated_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[SemanticModelStatus] = mapped_column(Enum(SemanticModelStatus), default=SemanticModelStatus.draft, index=True)
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    selected_tables: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    owner: Mapped["User"] = relationship()
+    data_sources: Mapped[list["SemanticModelDataSource"]] = relationship(
+        back_populates="semantic_model", cascade="all, delete-orphan"
+    )
+    versions: Mapped[list["SemanticModelVersion"]] = relationship(back_populates="semantic_model", cascade="all, delete-orphan")
+    entities: Mapped[list["BusinessEntity"]] = relationship(back_populates="semantic_model", cascade="all, delete-orphan")
+    relationships: Mapped[list["EntityRelationship"]] = relationship(
+        back_populates="semantic_model", cascade="all, delete-orphan", foreign_keys="EntityRelationship.semantic_model_id"
+    )
+    dimensions: Mapped[list["Dimension"]] = relationship(back_populates="semantic_model", cascade="all, delete-orphan")
+    measures: Mapped[list["Measure"]] = relationship(back_populates="semantic_model", cascade="all, delete-orphan")
+    calculated_fields: Mapped[list["CalculatedField"]] = relationship(back_populates="semantic_model", cascade="all, delete-orphan")
+    kpis: Mapped[list["KPI"]] = relationship(back_populates="semantic_model", cascade="all, delete-orphan")
+    hierarchies: Mapped[list["Hierarchy"]] = relationship(back_populates="semantic_model", cascade="all, delete-orphan")
+    glossary_terms: Mapped[list["BusinessGlossaryTerm"]] = relationship(
+        back_populates="semantic_model", cascade="all, delete-orphan"
+    )
+    validation_results: Mapped[list["ValidationResult"]] = relationship(
+        back_populates="semantic_model", cascade="all, delete-orphan"
+    )
+    documentation: Mapped["DocumentationMetadata"] = relationship(
+        back_populates="semantic_model", cascade="all, delete-orphan", uselist=False
+    )
+    impact_analyses: Mapped[list["ImpactAnalysisSnapshot"]] = relationship(
+        back_populates="semantic_model", cascade="all, delete-orphan"
+    )
+    time_intelligence_definitions: Mapped[list["TimeIntelligenceDefinition"]] = relationship(
+        back_populates="semantic_model", cascade="all, delete-orphan"
+    )
+
+
+class SemanticModelDataSource(Base):
+    __tablename__ = "semantic_model_data_sources"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "data_source_id", name="uq_model_data_source"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    data_source_id: Mapped[int] = mapped_column(ForeignKey("data_sources.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="data_sources")
+    data_source: Mapped["DataSource"] = relationship()
+
+
+class SemanticModelVersion(Base):
+    __tablename__ = "semantic_model_versions"
+    __table_args__ = (
+        UniqueConstraint("semantic_model_id", "version_number", name="uq_model_version"),
+        Index("ix_model_versions_model_created", "semantic_model_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    version_number: Mapped[int] = mapped_column(Integer)
+    status: Mapped[SemanticModelStatus] = mapped_column(Enum(SemanticModelStatus), default=SemanticModelStatus.draft)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    notes: Mapped[str] = mapped_column(String(500), default="")
+    snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_rollback: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="versions")
+
+
+class BusinessEntity(Base):
+    __tablename__ = "business_entities"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "display_name", name="uq_entity_display_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    display_name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    source_table: Mapped[str] = mapped_column(String(255), index=True)
+    primary_key: Mapped[str] = mapped_column(String(255))
+    business_owner: Mapped[str] = mapped_column(String(255), default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="entities")
+
+
+class EntityRelationship(Base):
+    __tablename__ = "entity_relationships"
+    __table_args__ = (
+        UniqueConstraint(
+            "semantic_model_id",
+            "from_entity_id",
+            "to_entity_id",
+            "from_field",
+            "to_field",
+            name="uq_entity_relationship_signature",
+        ),
+        Index("ix_entity_relationships_model", "semantic_model_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
+    from_entity_id: Mapped[int] = mapped_column(ForeignKey("business_entities.id"), index=True)
+    to_entity_id: Mapped[int] = mapped_column(ForeignKey("business_entities.id"), index=True)
+    from_field: Mapped[str] = mapped_column(String(255))
+    to_field: Mapped[str] = mapped_column(String(255))
+    relationship_type: Mapped[RelationshipType] = mapped_column(Enum(RelationshipType), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="relationships", foreign_keys=[semantic_model_id])
+    from_entity: Mapped["BusinessEntity"] = relationship(foreign_keys=[from_entity_id])
+    to_entity: Mapped["BusinessEntity"] = relationship(foreign_keys=[to_entity_id])
+
+
+class Dimension(Base):
+    __tablename__ = "dimensions"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "display_name", name="uq_dimension_display_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    entity_id: Mapped[int | None] = mapped_column(ForeignKey("business_entities.id"), nullable=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    data_type: Mapped[str] = mapped_column(String(100), default="string")
+    default_formatting: Mapped[str] = mapped_column(String(100), default="")
+    visibility: Mapped[bool] = mapped_column(Boolean, default=True)
+    grouping: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="dimensions")
+
+
+class Measure(Base):
+    __tablename__ = "measures"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "display_name", name="uq_measure_display_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    entity_id: Mapped[int | None] = mapped_column(ForeignKey("business_entities.id"), nullable=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(255), index=True)
+    aggregation_type: Mapped[str] = mapped_column(String(50), default="sum")
+    formatting: Mapped[str] = mapped_column(String(100), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    category: Mapped[str] = mapped_column(String(100), default="")
+    business_definition: Mapped[str] = mapped_column(Text, default="")
+    expression: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="measures")
+
+
+class CalculatedField(Base):
+    __tablename__ = "calculated_fields"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "display_name", name="uq_calculated_field_display_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    entity_id: Mapped[int | None] = mapped_column(ForeignKey("business_entities.id"), nullable=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    data_type: Mapped[str] = mapped_column(String(100), default="string")
+    expression: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="calculated_fields")
+
+
+class KPI(Base):
+    __tablename__ = "kpis"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "name", name="uq_kpi_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    business_description: Mapped[str] = mapped_column(Text, default="")
+    formula: Mapped[str] = mapped_column(Text)
+    target_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    warning_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    critical_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    unit: Mapped[str] = mapped_column(String(50), default="")
+    trend_direction: Mapped[TrendDirection] = mapped_column(Enum(TrendDirection), default=TrendDirection.up)
+    display_format: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="kpis")
+
+
+class TimeIntelligenceDefinition(Base):
+    __tablename__ = "time_intelligence_definitions"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "name", name="uq_time_intelligence_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    expression: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="time_intelligence_definitions")
+
+
+class Hierarchy(Base):
+    __tablename__ = "hierarchies"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "name", name="uq_hierarchy_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="hierarchies")
+    levels: Mapped[list["HierarchyLevel"]] = relationship(back_populates="hierarchy", cascade="all, delete-orphan")
+
+
+class HierarchyLevel(Base):
+    __tablename__ = "hierarchy_levels"
+    __table_args__ = (
+        UniqueConstraint("hierarchy_id", "level_order", name="uq_hierarchy_level_order"),
+        Index("ix_hierarchy_levels_hierarchy_order", "hierarchy_id", "level_order"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    hierarchy_id: Mapped[int] = mapped_column(ForeignKey("hierarchies.id"), index=True)
+    level_order: Mapped[int] = mapped_column(Integer)
+    level_name: Mapped[str] = mapped_column(String(255))
+    dimension_name: Mapped[str] = mapped_column(String(255))
+
+    hierarchy: Mapped["Hierarchy"] = relationship(back_populates="levels")
+
+
+class BusinessGlossaryTerm(Base):
+    __tablename__ = "business_glossary_terms"
+    __table_args__ = (UniqueConstraint("semantic_model_id", "business_name", name="uq_glossary_business_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    business_name: Mapped[str] = mapped_column(String(255), index=True)
+    technical_name: Mapped[str] = mapped_column(String(255), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    business_owner: Mapped[str] = mapped_column(String(255), default="")
+    synonyms: Mapped[list[str]] = mapped_column(JSON, default=list)
+    related_metrics: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="glossary_terms")
+
+
+class ValidationResult(Base):
+    __tablename__ = "validation_results"
+    __table_args__ = (Index("ix_validation_results_model_version", "semantic_model_id", "version_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    version_id: Mapped[int | None] = mapped_column(ForeignKey("semantic_model_versions.id"), nullable=True, index=True)
+    severity: Mapped[ValidationSeverity] = mapped_column(Enum(ValidationSeverity), index=True)
+    code: Mapped[str] = mapped_column(String(100), index=True)
+    message: Mapped[str] = mapped_column(String(500))
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="validation_results")
+
+
+class DocumentationMetadata(Base):
+    __tablename__ = "documentation_metadata"
+    __table_args__ = (UniqueConstraint("semantic_model_id", name="uq_documentation_model"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    generated_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    content: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="documentation")
+
+
+class ImpactAnalysisSnapshot(Base):
+    __tablename__ = "impact_analysis_snapshots"
+    __table_args__ = (Index("ix_impact_analysis_model_version", "semantic_model_id", "version_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    semantic_model_id: Mapped[int] = mapped_column(ForeignKey("semantic_models.id"), index=True)
+    version_id: Mapped[int | None] = mapped_column(ForeignKey("semantic_model_versions.id"), nullable=True, index=True)
+    dashboards_affected: Mapped[list[str]] = mapped_column(JSON, default=list)
+    reports_affected: Mapped[list[str]] = mapped_column(JSON, default=list)
+    kpis_affected: Mapped[list[str]] = mapped_column(JSON, default=list)
+    ai_features_affected: Mapped[list[str]] = mapped_column(JSON, default=list)
+    scheduled_jobs_affected: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    semantic_model: Mapped["SemanticModel"] = relationship(back_populates="impact_analyses")
