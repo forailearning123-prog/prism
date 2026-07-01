@@ -1,5 +1,7 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
+
+from pydantic_settings import BaseSettings
 
 _INSECURE_DEFAULT = "change-me-in-production-use-a-long-random-string"
 
@@ -19,6 +21,11 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./prism.db"
+
+    # AI / LLM settings
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: Optional[str] = None
 
     class Config:
         env_file = ".env"

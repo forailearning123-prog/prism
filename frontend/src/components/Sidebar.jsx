@@ -8,11 +8,13 @@ import {
   Zap,
   Database,
   Layers,
+  BrainCircuit,
 } from 'lucide-react'
 
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/briefing', icon: Newspaper, label: 'Daily Briefing' },
+  { to: '/analyst', icon: BrainCircuit, label: 'AI Analyst' },
   { to: '/executives', icon: Users, label: 'AI Executives' },
   { to: '/connections', icon: Database, label: 'Data Sources' },
   { to: '/semantic-models', icon: Layers, label: 'Semantic Models' },

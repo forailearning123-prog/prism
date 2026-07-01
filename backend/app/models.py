@@ -832,3 +832,192 @@ class DashboardRecommendation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     dashboard: Mapped["Dashboard"] = relationship(back_populates="recommendations")
+
+
+# --- AI Analyst Models ---
+
+class ConversationStatus(str, enum.Enum):
+    active = "active"
+    archived = "archived"
+    deleted = "deleted"
+
+
+class MessageRole(str, enum.Enum):
+    user = "user"
+    assistant = "assistant"
+    system = "system"
+
+
+class FeedbackType(str, enum.Enum):
+    rating = "rating"
+    incorrect = "incorrect"
+    misleading = "misleading"
+    glossary_suggestion = "glossary_suggestion"
+
+
+class ReportType(str, enum.Enum):
+    executive_summary = "executive_summary"
+    business_review = "business_review"
+    department_report = "department_report"
+    kpi_report = "kpi_report"
+    operational_report = "operational_report"
+    monthly_review = "monthly_review"
+    quarterly_review = "quarterly_review"
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+    __table_args__ = (
+        Index("ix_conversations_user_status", "user_id", "status"),
+        Index("ix_conversations_updated_at", "updated_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(500), default="New Conversation")
+    status: Mapped[ConversationStatus] = mapped_column(
+        Enum(ConversationStatus), default=ConversationStatus.active, index=True
+    )
+    is_favourite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    dashboard_context_id: Mapped[int | None] = mapped_column(ForeignKey("dashboards.id"), nullable=True)
+    semantic_model_id: Mapped[int | None] = mapped_column(ForeignKey("semantic_models.id"), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    user: Mapped["User"] = relationship()
+    messages: Mapped[list["AnalystMessage"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+    bookmarks: Mapped[list["ConversationBookmark"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+    insights: Mapped[list["SavedInsight"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan"
+    )
+
+
+class AnalystMessage(Base):
+    __tablename__ = "analyst_messages"
+    __table_args__ = (
+        Index("ix_analyst_messages_conversation_created", "conversation_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    role: Mapped[MessageRole] = mapped_column(Enum(MessageRole), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    executive_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_findings: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    supporting_evidence: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    business_interpretation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    data_sources_used: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    visualizations: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    recommendations: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    suggested_questions: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    intent: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
+    )
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    feedback: Mapped[list["UserFeedback"]] = relationship(
+        back_populates="message", cascade="all, delete-orphan"
+    )
+
+
+class ConversationBookmark(Base):
+    __tablename__ = "conversation_bookmarks"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("analyst_messages.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    label: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="bookmarks")
+    message: Mapped["AnalystMessage"] = relationship()
+
+
+class SavedInsight(Base):
+    __tablename__ = "saved_insights"
+    __table_args__ = (Index("ix_saved_insights_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analyst_messages.id"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(500))
+    content: Mapped[str] = mapped_column(Text)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="insights")
+
+
+class UserFeedback(Base):
+    __tablename__ = "user_feedback"
+    __table_args__ = (Index("ix_user_feedback_message", "message_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("analyst_messages.id"), index=True)
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    feedback_type: Mapped[FeedbackType] = mapped_column(
+        Enum(FeedbackType), default=FeedbackType.rating
+    )
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    message: Mapped["AnalystMessage"] = relationship(back_populates="feedback")
+
+
+class AnalystAuditLog(Base):
+    __tablename__ = "analyst_audit_logs"
+    __table_args__ = (Index("ix_analyst_audit_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversations.id"), nullable=True, index=True
+    )
+    action: Mapped[str] = mapped_column(String(100), index=True)
+    question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    intent: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
+    )
+
+
+class ReportDefinition(Base):
+    __tablename__ = "report_definitions"
+    __table_args__ = (Index("ix_report_definitions_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    conversation_id: Mapped[int | None] = mapped_column(ForeignKey("conversations.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(500))
+    report_type: Mapped[ReportType] = mapped_column(Enum(ReportType), index=True)
+    content: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
+    )

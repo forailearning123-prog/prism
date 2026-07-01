@@ -10,6 +10,7 @@ import Settings from './pages/Settings'
 import Connections from './pages/Connections'
 import DataSourceDetails from './pages/DataSourceDetails'
 import SemanticModels from './pages/SemanticModels'
+import AIAnalyst from './pages/AIAnalyst'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/briefing" element={<Briefing />} />
+            <Route path="/analyst" element={<AIAnalyst />} />
             <Route path="/executives" element={<Executives />} />
             <Route path="/connections" element={<Connections />} />
             <Route path="/connections/:sourceId" element={<DataSourceDetails />} />
