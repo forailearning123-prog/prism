@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard'
 import Briefing from './pages/Briefing'
 import Executives from './pages/Executives'
 import Settings from './pages/Settings'
+import Connections from './pages/Connections'
+import DataSourceDetails from './pages/DataSourceDetails'
 
 export default function App() {
   return (
@@ -19,6 +21,8 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/briefing" element={<Briefing />} />
             <Route path="/executives" element={<Executives />} />
+            <Route path="/connections" element={<Connections />} />
+            <Route path="/connections/:sourceId" element={<DataSourceDetails />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>

@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import init_db
-from app.routers import auth, executives, briefing, health
+from app.routers import auth, executives, briefing, health, connections
 from app.auth import get_password_hash
 from app.database import AsyncSessionLocal
 from app.models import User
@@ -61,13 +61,14 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={"error": "Internal Server Error", "detail": str(exc)},
+        content={"error": "Internal Server Error", "detail": "An unexpected error occurred."},
     )
 
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(executives.router, prefix="/api/v1")
 app.include_router(briefing.router, prefix="/api/v1")
+app.include_router(connections.router, prefix="/api/v1")
 
 
 @app.get("/")

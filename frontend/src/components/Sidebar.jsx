@@ -6,12 +6,14 @@ import {
   Users,
   Settings,
   Zap,
+  Database,
 } from 'lucide-react'
 
 const nav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/briefing', icon: Newspaper, label: 'Daily Briefing' },
   { to: '/executives', icon: Users, label: 'AI Executives' },
+  { to: '/connections', icon: Database, label: 'Data Sources' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
