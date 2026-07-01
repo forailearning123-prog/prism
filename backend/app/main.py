@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import init_db
-from app.routers import auth, executives, briefing, health, connections, semantic_models, dashboards
+from app.routers import analyst, auth, executives, briefing, health, connections, semantic_models, dashboards
 from app.auth import get_password_hash
 from app.database import AsyncSessionLocal
 from app.models import User
@@ -74,6 +74,7 @@ app.include_router(briefing.router, prefix="/api/v1")
 app.include_router(connections.router, prefix="/api/v1")
 app.include_router(semantic_models.router, prefix="/api/v1")
 app.include_router(dashboards.router, prefix="/api/v1")
+app.include_router(analyst.router, prefix="/api/v1")
 
 
 @app.get("/")
