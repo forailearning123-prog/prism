@@ -10,6 +10,7 @@ import {
   Layers,
   BrainCircuit,
   TrendingUp,
+  Activity,
 } from 'lucide-react'
 
 const nav = [
@@ -17,6 +18,7 @@ const nav = [
   { to: '/briefing', icon: Newspaper, label: 'Daily Briefing' },
   { to: '/analyst', icon: BrainCircuit, label: 'AI Analyst' },
   { to: '/executives', icon: Users, label: 'AI Executives' },
+  { to: '/monitoring', icon: Activity, label: 'Monitoring' },
   { to: '/connections', icon: Database, label: 'Data Sources' },
   { to: '/semantic-models', icon: Layers, label: 'Semantic Models' },
   { to: '/forecasting', icon: TrendingUp, label: 'Forecasting' },
