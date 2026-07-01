@@ -1,45 +1,28 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './context/AuthContext'
-import Layout from './components/Layout'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Briefing from './pages/Briefing'
-import Executives from './pages/Executives'
-import Settings from './pages/Settings'
-import Connections from './pages/Connections'
-import DataSourceDetails from './pages/DataSourceDetails'
-import SemanticModels from './pages/SemanticModels'
-import AIAnalyst from './pages/AIAnalyst'
-import Forecasting from './pages/Forecasting'
-import Monitoring from './pages/Monitoring'
-import Collaboration from './pages/Collaboration'
-import Agents from './pages/Agents'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import Dashboard from './pages/Dashboard';
+import Agents from './pages/Agents';
+import Integrations from './pages/Integrations';
+import Monitoring from './pages/Monitoring';
+import Collaboration from './pages/Collaboration';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<Layout />}>
+    <Router>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto">
+          <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/briefing" element={<Briefing />} />
-            <Route path="/analyst" element={<AIAnalyst />} />
-            <Route path="/executives" element={<Executives />} />
-            <Route path="/connections" element={<Connections />} />
-            <Route path="/connections/:sourceId" element={<DataSourceDetails />} />
-            <Route path="/semantic-models" element={<SemanticModels />} />
+            <Route path="/agents" element={<Agents />} />
+            <Route path="/integrations" element={<Integrations />} />
             <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/collaboration" element={<Collaboration />} />
-            <Route path="/agents" element={<Agents />} />
-            <Route path="/forecasting" element={<Forecasting />} />
-            <Route path="/forecasting/:forecastId" element={<Forecasting />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-  )
+          </Routes>
+        </main>
+      </div>
+    </Router>
+  );
 }

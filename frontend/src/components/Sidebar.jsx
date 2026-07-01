@@ -1,69 +1,50 @@
-import React from 'react'
-import { NavLink } from 'react-router-dom'
-import {
-  LayoutDashboard,
-  Newspaper,
-  Users,
-  Settings,
-  Zap,
-  Database,
-  Layers,
-  BrainCircuit,
-  TrendingUp,
-  Activity,
-  MessageSquare,
-  Bot,
-} from 'lucide-react'
-
-const nav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/briefing', icon: Newspaper, label: 'Daily Briefing' },
-  { to: '/analyst', icon: BrainCircuit, label: 'AI Analyst' },
-  { to: '/executives', icon: Users, label: 'AI Executives' },
-  { to: '/monitoring', icon: Activity, label: 'Monitoring' },
-  { to: '/collaboration', icon: MessageSquare, label: 'Collaboration' },
-  { to: '/agents', icon: Bot, label: 'AI Agents' },
-  { to: '/connections', icon: Database, label: 'Data Sources' },
-  { to: '/semantic-models', icon: Layers, label: 'Semantic Models' },
-  { to: '/forecasting', icon: TrendingUp, label: 'Forecasting' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-]
+import React from 'react';
+import { NavLink } from 'react-router-dom';
 
 export default function Sidebar() {
+  const navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/agents', label: 'AI Agents', icon: '🤖' },
+    { path: '/integrations', label: 'Integrations', icon: '🔗' },
+    { path: '/monitoring', label: 'Monitoring', icon: '📈' },
+    { path: '/collaboration', label: 'Collaboration', icon: '👥' },
+  ];
+
   return (
-    <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-800">
-        <div className="w-8 h-8 bg-prism-600 rounded-lg flex items-center justify-center">
-          <Zap size={18} className="text-white" />
-        </div>
-        <span className="text-lg font-bold text-white tracking-tight">Prism</span>
+    <aside className="w-64 bg-gray-900 text-white flex flex-col">
+      <div className="p-6 border-b border-gray-800">
+        <h1 className="text-xl font-bold">Prism Platform</h1>
+        <p className="text-sm text-gray-400 mt-1">Business Intelligence</p>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {nav.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-prism-900/60 text-prism-300 border border-prism-800'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
-              }`
-            }
-          >
-            <Icon size={18} />
-            {label}
-          </NavLink>
-        ))}
+      <nav className="flex-1 p-4">
+        <ul className="space-y-2">
+          {navItems.map((item) => (
+            <li key={item.path}>
+              <NavLink
+                to={item.path}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  }`
+                }
+              >
+                <span className="text-xl">{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+              </NavLink>
+            </li>
+          ))}
+        </ul>
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-800">
-        <p className="text-xs text-gray-600">Prism v0.1.0 · Community Edition</p>
+      <div className="p-4 border-t border-gray-800">
+        <div className="text-xs text-gray-400">
+          <p>Enterprise Integration Hub</p>
+          <p className="mt-1">Version 1.0.0</p>
+        </div>
       </div>
     </aside>
-  )
+  );
 }
