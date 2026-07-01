@@ -11,6 +11,7 @@ import Connections from './pages/Connections'
 import DataSourceDetails from './pages/DataSourceDetails'
 import SemanticModels from './pages/SemanticModels'
 import AIAnalyst from './pages/AIAnalyst'
+import Forecasting from './pages/Forecasting'
 
 export default function App() {
   return (
@@ -27,6 +28,8 @@ export default function App() {
             <Route path="/connections" element={<Connections />} />
             <Route path="/connections/:sourceId" element={<DataSourceDetails />} />
             <Route path="/semantic-models" element={<SemanticModels />} />
+            <Route path="/forecasting" element={<Forecasting />} />
+            <Route path="/forecasting/:forecastId" element={<Forecasting />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
