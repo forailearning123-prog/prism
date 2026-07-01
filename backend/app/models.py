@@ -78,6 +78,7 @@ class User(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
     data_sources: Mapped[list["DataSource"]] = relationship(back_populates="owner")
+    dashboards: Mapped[list["Dashboard"]] = relationship(back_populates="owner")
 
 
 class DataSource(Base):
@@ -546,3 +547,288 @@ class ImpactAnalysisSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     semantic_model: Mapped["SemanticModel"] = relationship(back_populates="impact_analyses")
+
+
+class DashboardStatus(str, enum.Enum):
+    draft = "draft"
+    published = "published"
+    archived = "archived"
+
+
+class DashboardCreationMode(str, enum.Enum):
+    ai = "ai"
+    wizard = "wizard"
+    blank = "blank"
+
+
+class DashboardWidgetType(str, enum.Enum):
+    kpi_card = "kpi_card"
+    line_chart = "line_chart"
+    bar_chart = "bar_chart"
+    area_chart = "area_chart"
+    pie_chart = "pie_chart"
+    donut_chart = "donut_chart"
+    scatter_chart = "scatter_chart"
+    heat_map = "heat_map"
+    tree_map = "tree_map"
+    waterfall_chart = "waterfall_chart"
+    funnel_chart = "funnel_chart"
+    gauge_chart = "gauge_chart"
+    table = "table"
+    pivot_table = "pivot_table"
+    map = "map"
+    timeline = "timeline"
+    text_panel = "text_panel"
+    image = "image"
+    embedded_content = "embedded_content"
+
+
+class DashboardFilterScope(str, enum.Enum):
+    global_scope = "global"
+    dashboard = "dashboard"
+    widget = "widget"
+    quick = "quick"
+    advanced = "advanced"
+    relative_date = "relative_date"
+    saved = "saved"
+    cross = "cross"
+
+
+class DashboardVisibility(str, enum.Enum):
+    private = "private"
+    team = "team"
+    department = "department"
+    organisation = "organisation"
+    public_link = "public_link"
+
+
+class DashboardPermissionRole(str, enum.Enum):
+    viewer = "viewer"
+    editor = "editor"
+    owner = "owner"
+
+
+class DashboardRecommendationType(str, enum.Enum):
+    better_chart = "better_chart"
+    missing_kpi = "missing_kpi"
+    redundant_visual = "redundant_visual"
+    layout = "layout"
+    accessibility = "accessibility"
+    performance = "performance"
+
+
+class Dashboard(Base):
+    __tablename__ = "dashboards"
+    __table_args__ = (
+        Index("ix_dashboards_owner_status", "owner_id", "status"),
+        Index("ix_dashboards_updated_status", "updated_at", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    folder: Mapped[str] = mapped_column(String(255), default="", index=True)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[DashboardStatus] = mapped_column(Enum(DashboardStatus), default=DashboardStatus.draft, index=True)
+    is_favourite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    shared_with: Mapped[list[str]] = mapped_column(JSON, default=list)
+    semantic_model_id: Mapped[int | None] = mapped_column(ForeignKey("semantic_models.id"), nullable=True, index=True)
+    theme_id: Mapped[int | None] = mapped_column(ForeignKey("dashboard_themes.id"), nullable=True, index=True)
+    creation_mode: Mapped[DashboardCreationMode] = mapped_column(
+        Enum(DashboardCreationMode), default=DashboardCreationMode.blank, index=True
+    )
+    ai_prompt: Mapped[str] = mapped_column(Text, default="")
+    last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+    auto_save_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    owner: Mapped["User"] = relationship(back_populates="dashboards")
+    semantic_model: Mapped["SemanticModel"] = relationship()
+    theme: Mapped["DashboardTheme"] = relationship(back_populates="dashboards")
+    widgets: Mapped[list["DashboardWidget"]] = relationship(back_populates="dashboard", cascade="all, delete-orphan")
+    filters: Mapped[list["DashboardFilter"]] = relationship(back_populates="dashboard", cascade="all, delete-orphan")
+    versions: Mapped[list["DashboardVersion"]] = relationship(back_populates="dashboard", cascade="all, delete-orphan")
+    permissions: Mapped[list["DashboardPermission"]] = relationship(back_populates="dashboard", cascade="all, delete-orphan")
+    layout_metadata_entries: Mapped[list["DashboardLayoutMetadata"]] = relationship(
+        back_populates="dashboard", cascade="all, delete-orphan"
+    )
+    usage_entries: Mapped[list["DashboardUsage"]] = relationship(back_populates="dashboard", cascade="all, delete-orphan")
+    recommendations: Mapped[list["DashboardRecommendation"]] = relationship(
+        back_populates="dashboard", cascade="all, delete-orphan"
+    )
+
+
+class DashboardVersion(Base):
+    __tablename__ = "dashboard_versions"
+    __table_args__ = (
+        UniqueConstraint("dashboard_id", "version_number", name="uq_dashboard_version_number"),
+        Index("ix_dashboard_versions_dashboard_created", "dashboard_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("dashboards.id"), index=True)
+    version_number: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    description: Mapped[str] = mapped_column(String(500), default="")
+    status: Mapped[DashboardStatus] = mapped_column(Enum(DashboardStatus), default=DashboardStatus.draft)
+    snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    dashboard: Mapped["Dashboard"] = relationship(back_populates="versions")
+
+
+class DashboardWidget(Base):
+    __tablename__ = "dashboard_widgets"
+    __table_args__ = (Index("ix_dashboard_widgets_dashboard_position", "dashboard_id", "position_y", "position_x"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("dashboards.id"), index=True)
+    widget_type: Mapped[DashboardWidgetType] = mapped_column(Enum(DashboardWidgetType), index=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    subtitle: Mapped[str] = mapped_column(String(255), default="")
+    description: Mapped[str] = mapped_column(String(1000), default="")
+    data_source: Mapped[str] = mapped_column(String(255), default="")
+    dimensions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    measures: Mapped[list[str]] = mapped_column(JSON, default=list)
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    colors: Mapped[dict] = mapped_column(JSON, default=dict)
+    number_formatting: Mapped[dict] = mapped_column(JSON, default=dict)
+    conditional_formatting: Mapped[dict] = mapped_column(JSON, default=dict)
+    legends: Mapped[dict] = mapped_column(JSON, default=dict)
+    labels: Mapped[dict] = mapped_column(JSON, default=dict)
+    tooltips: Mapped[dict] = mapped_column(JSON, default=dict)
+    drill_behavior: Mapped[dict] = mapped_column(JSON, default=dict)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
+    position_x: Mapped[int] = mapped_column(Integer, default=0)
+    position_y: Mapped[int] = mapped_column(Integer, default=0)
+    width: Mapped[int] = mapped_column(Integer, default=4)
+    height: Mapped[int] = mapped_column(Integer, default=3)
+    z_index: Mapped[int] = mapped_column(Integer, default=0)
+    is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
+    group_key: Mapped[str] = mapped_column(String(100), default="")
+    alignment: Mapped[str] = mapped_column(String(50), default="start")
+    snap_to_grid: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    dashboard: Mapped["Dashboard"] = relationship(back_populates="widgets")
+
+
+class DashboardFilter(Base):
+    __tablename__ = "dashboard_filters"
+    __table_args__ = (Index("ix_dashboard_filters_dashboard_scope", "dashboard_id", "scope"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("dashboards.id"), index=True)
+    widget_id: Mapped[int | None] = mapped_column(ForeignKey("dashboard_widgets.id"), nullable=True, index=True)
+    scope: Mapped[DashboardFilterScope] = mapped_column(Enum(DashboardFilterScope), default=DashboardFilterScope.dashboard)
+    name: Mapped[str] = mapped_column(String(255))
+    field: Mapped[str] = mapped_column(String(255))
+    operator: Mapped[str] = mapped_column(String(50), default="equals")
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_saved: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    dashboard: Mapped["Dashboard"] = relationship(back_populates="filters")
+
+
+class DashboardTheme(Base):
+    __tablename__ = "dashboard_themes"
+    __table_args__ = (UniqueConstraint("name", "owner_id", name="uq_dashboard_theme_name_owner"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    variant: Mapped[str] = mapped_column(String(50), default="custom", index=True)
+    brand_colors: Mapped[dict] = mapped_column(JSON, default=dict)
+    typography: Mapped[dict] = mapped_column(JSON, default=dict)
+    logo_url: Mapped[str] = mapped_column(String(500), default="")
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    dashboards: Mapped[list["Dashboard"]] = relationship(back_populates="theme")
+
+
+class DashboardPermission(Base):
+    __tablename__ = "dashboard_permissions"
+    __table_args__ = (UniqueConstraint("dashboard_id", "principal", name="uq_dashboard_permission_principal"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("dashboards.id"), index=True)
+    visibility: Mapped[DashboardVisibility] = mapped_column(Enum(DashboardVisibility), default=DashboardVisibility.private)
+    principal: Mapped[str] = mapped_column(String(255), index=True)
+    role: Mapped[DashboardPermissionRole] = mapped_column(Enum(DashboardPermissionRole), default=DashboardPermissionRole.viewer)
+    granted_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    dashboard: Mapped["Dashboard"] = relationship(back_populates="permissions")
+
+
+class DashboardLayoutMetadata(Base):
+    __tablename__ = "dashboard_layout_metadata"
+    __table_args__ = (UniqueConstraint("dashboard_id", "key", name="uq_dashboard_layout_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("dashboards.id"), index=True)
+    key: Mapped[str] = mapped_column(String(255))
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    dashboard: Mapped["Dashboard"] = relationship(back_populates="layout_metadata_entries")
+
+
+class DashboardUsage(Base):
+    __tablename__ = "dashboard_usage"
+    __table_args__ = (Index("ix_dashboard_usage_dashboard_viewed", "dashboard_id", "viewed_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("dashboards.id"), index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    render_time_ms: Mapped[int] = mapped_column(Integer, default=0)
+    widget_count: Mapped[int] = mapped_column(Integer, default=0)
+    query_count: Mapped[int] = mapped_column(Integer, default=0)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+
+    dashboard: Mapped["Dashboard"] = relationship(back_populates="usage_entries")
+
+
+class DashboardRecommendation(Base):
+    __tablename__ = "dashboard_recommendations"
+    __table_args__ = (Index("ix_dashboard_recommendations_dashboard_created", "dashboard_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("dashboards.id"), index=True)
+    recommendation_type: Mapped[DashboardRecommendationType] = mapped_column(Enum(DashboardRecommendationType), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(String(1000), default="")
+    reason: Mapped[str] = mapped_column(String(1000), default="")
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    dashboard: Mapped["Dashboard"] = relationship(back_populates="recommendations")
