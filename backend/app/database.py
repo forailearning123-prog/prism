@@ -12,6 +12,38 @@ class Base(DeclarativeBase):
     pass
 
 
+# Import all models to ensure they are registered with SQLAlchemy
+from app.models import (
+    User, DataSource, Tag, DataSourceTag, MetadataEntry, SyncHistory, ConnectionLog, DataSourcePermission,
+    SemanticModel, SemanticModelDataSource, SemanticModelVersion, BusinessEntity, EntityRelationship,
+    Dimension, Measure, CalculatedField, KPI, TimeIntelligenceDefinition, Hierarchy, HierarchyLevel,
+    BusinessGlossaryTerm, ValidationResult, DocumentationMetadata, ImpactAnalysisSnapshot,
+    Dashboard, DashboardVersion, DashboardWidget, DashboardFilter, DashboardTheme, DashboardPermission,
+    DashboardLayoutMetadata, DashboardUsage, DashboardRecommendation,
+    Conversation, AnalystMessage, ConversationBookmark, SavedInsight, UserFeedback, AnalystAuditLog,
+    ReportDefinition,
+    ForecastDefinition, ForecastResult, ScenarioPlan, WhatIfVariable, DriverAnalysis,
+    RiskAssessment, OpportunityInsight, ForecastVersion, PredictionAlert, RecommendationHistory,
+    Monitor, MonitorRule, AlertEvent, AlertComment, NotificationConfig, NotificationDelivery,
+    AnomalyEvent, WorkflowDefinition, WorkflowStep, WorkflowExecution, WorkflowStepResult,
+    EscalationPolicy, EscalationStep, ScheduledInsight, InsightDeliveryHistory, SLAMetric, SLABreachRecord,
+    BusinessHealthScore, AuditRecord,
+)
+
+from app.collaboration.models import (
+    Workspace, WorkspaceMember,
+    Discussion, Comment,
+    DecisionRecord, DecisionParticipant, DecisionHistory,
+    ActionItem,
+    ApprovalWorkflow, ApprovalWorkflowStep, ApprovalInstance, ApprovalAction,
+    MeetingSummary, MeetingPack,
+    KnowledgeArticle,
+    Notification, NotificationPreference,
+    CollaborationMetric,
+    DecisionImpact,
+)
+
+
 async def get_db():
     async with AsyncSessionLocal() as session:
         try:
