@@ -43,6 +43,18 @@ from app.collaboration.models import (
     DecisionImpact,
 )
 
+from app.agents.models import (
+    AIAgent, AgentTemplate,
+    AgentMemory,
+    AgentTask, AgentExecution,
+    AgentRecommendation,
+    AgentCollaboration,
+    AgentApproval,
+    AgentPerformance,
+    AgentActivity,
+    AgentPermission,
+)
+
 
 async def get_db():
     async with AsyncSessionLocal() as session:

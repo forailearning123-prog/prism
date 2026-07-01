@@ -14,6 +14,7 @@ import AIAnalyst from './pages/AIAnalyst'
 import Forecasting from './pages/Forecasting'
 import Monitoring from './pages/Monitoring'
 import Collaboration from './pages/Collaboration'
+import Agents from './pages/Agents'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/semantic-models" element={<SemanticModels />} />
             <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/collaboration" element={<Collaboration />} />
+            <Route path="/agents" element={<Agents />} />
             <Route path="/forecasting" element={<Forecasting />} />
             <Route path="/forecasting/:forecastId" element={<Forecasting />} />
             <Route path="/settings" element={<Settings />} />
