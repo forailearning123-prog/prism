@@ -8,6 +8,7 @@ from app.database import init_db
 from app.routers import analyst, auth, executives, briefing, health, connections, semantic_models, dashboards, forecasting, monitoring
 from app.collaboration.router import router as collaboration_router
 from app.agents.router import router as agents_router
+from app.tenants.router import router as tenants_router
 from app.auth import get_password_hash
 from app.database import AsyncSessionLocal
 from app.models import User
@@ -81,6 +82,7 @@ app.include_router(forecasting.router, prefix="/api/v1")
 app.include_router(monitoring.router)
 app.include_router(collaboration_router)
 app.include_router(agents_router)
+app.include_router(tenants_router)
 
 
 @app.get("/")

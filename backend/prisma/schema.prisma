@@ -99,3 +99,431 @@ model ConnectionTag {
   connection   Connection @relation(fields: [connectionId], references: [id])
   name         String
 }
+
+# ──────────────────────────────────────────────
+# Tenant Management Module (Sprint 10)
+# ──────────────────────────────────────────────
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+  PENDING
+}
+
+enum SubscriptionTier {
+  TRIAL
+  STANDARD
+  PROFESSIONAL
+  ENTERPRISE
+  CUSTOM
+}
+
+enum WorkspaceType {
+  GENERAL
+  FINANCE
+  HR
+  SALES
+  OPERATIONS
+  EXECUTIVE
+  DATA_SCIENCE
+  CUSTOM
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Organization {
+  id                    String    @id @default(uuid())
+  name                  String
+  slug                  String    @unique
+  description           String    @default("")
+  industry              String    @default("")
+  timezone              String    @default("UTC")
+  locale                String    @default("en-US")
+  status                OrganizationStatus @default(ACTIVE)
+  subscriptionTier      SubscriptionTier @default(TRIAL)
+  
+  // Branding
+  logoUrl               String    @default("")
+  primaryColor          String    @default("#007bff")
+  secondaryColor        String    @default("#6c757d")
+  customDomain          String    @default("")
+  
+  // Limits and quotas
+  maxUsers              Int       @default(10)
+  maxWorkspaces         Int       @default(5)
+  maxStorageGb          Float     @default(10.0)
+  maxAiRequestsPerMonth Int       @default(1000)
+  maxApiCallsPerMonth   Int       @default(10000)
+  
+  // Settings
+  settings              Json      @default({})
+  featureFlags          Json      @default({})
+  
+  // Metadata
+  createdById           String?
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @db.Timestamptz
+  archivedAt             DateTime? @db.Timestamptz
+  
+  // Relations
+  workspaces            Workspace[]
+  members               OrganizationMember[]
+  brandingConfig        BrandingConfig?
+  subscription          Subscription?
+  apiKeys               ApiKey[]
+  auditLogs             AuditLog[]
+  usageMetrics          UsageMetric[]
+  
+  @@index([slug])
+  @@index([status])
+  @@index([createdAt])
+  @@map("organizations")
+}
+
+model Workspace {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  description     String       @default("")
+  workspaceType   WorkspaceType @default(GENERAL)
+  isDefault       Boolean      @default(false)
+  isPublic        Boolean      @default(false)
+  
+  // Settings
+  settings        Json         @default({})
+  featureFlags    Json         @default({})
+  
+  // Metadata
+  createdById     String?
+  createdAt        DateTime     @default(now()) @db.Timestamptz
+  updatedAt        DateTime     @updatedAt @db.Timestamptz
+  archivedAt       DateTime?    @db.Timestamptz
+  
+  // Relations
+  members         WorkspaceMember[]
+  
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("workspaces")
+}
+
+model OrganizationMember {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  role            MemberRole   @default(MEMBER)
+  isActive        Boolean      @default(true)
+  
+  // Metadata
+  invitedById     String?
+  inviter         User?        @relation("InvitedOrganizationMembers", fields: [invitedById], references: [id])
+  joinedAt        DateTime?    @db.Timestamptz
+  createdAt        DateTime     @default(now()) @db.Timestamptz
+  updatedAt        DateTime     @updatedAt @db.Timestamptz
+  
+  @@unique([organizationId, userId])
+  @@index([organizationId, userId])
+  @@map("organization_members")
+}
+
+model WorkspaceMember {
+  id              String       @id @default(uuid())
+  workspaceId     String
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  role            MemberRole   @default(MEMBER)
+  isActive        Boolean      @default(true)
+  
+  // Metadata
+  joinedAt        DateTime?    @db.Timestamptz
+  createdAt        DateTime     @default(now()) @db.Timestamptz
+  updatedAt        DateTime     @updatedAt @db.Timestamptz
+  
+  @@unique([workspaceId, userId])
+  @@index([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model BrandingConfig {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Logo and images
+  logoUrl               String    @default("")
+  logoDarkUrl           String    @default("")
+  faviconUrl            String    @default("")
+  backgroundImageUrl    String    @default("")
+  
+  // Colors
+  primaryColor          String    @default("#007bff")
+  secondaryColor        String    @default("#6c757d")
+  accentColor           String    @default("#28a745")
+  backgroundColor       String    @default("#ffffff")
+  textColor             String    @default("#212529")
+  
+  // Typography
+  fontFamily            String    @default("Inter, sans-serif")
+  headingFontFamily     String    @default("Inter, sans-serif")
+  
+  // Login screen
+  loginPageTitle        String    @default("")
+  loginPageDescription  String    @default("")
+  loginBackgroundImage  String    @default("")
+  
+  // Email templates
+  emailHeaderLogo       String    @default("")
+  emailFooterText       String    @default("")
+  
+  // Advanced
+  customCss             String    @default("")
+  cssVariables          Json      @default({})
+  
+  // Metadata
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @db.Timestamptz
+  
+  @@unique([organizationId])
+  @@map("branding_configs")
+}
+
+model Subscription {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId                String?
+  
+  // Subscription details
+  status                String    @default("active")
+  startsAt              DateTime  @default(now()) @db.Timestamptz
+  expiresAt             DateTime? @db.Timestamptz
+  cancelledAt           DateTime? @db.Timestamptz
+  
+  // Billing
+  billingCycle          String    @default("monthly")
+  amount                Float     @default(0.0)
+  currency              String    @default("USD")
+  
+  // Metadata
+  metadata              Json      @default({})
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @db.Timestamptz
+  
+  @@index([organizationId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model SubscriptionPlan {
+  id                    String    @id @default(uuid())
+  name                  String
+  tier                  SubscriptionTier
+  description           String    @default("")
+  
+  // Limits
+  maxUsers              Int       @default(10)
+  maxWorkspaces         Int       @default(5)
+  maxStorageGb          Float     @default(10.0)
+  maxAiRequestsPerMonth Int       @default(1000)
+  maxApiCallsPerMonth   Int       @default(10000)
+  maxScheduledJobs      Int       @default(10)
+  
+  // Features
+  features              Json      @default({})
+  
+  // Pricing
+  priceMonthly          Float     @default(0.0)
+  priceAnnual           Float     @default(0.0)
+  currency              String    @default("USD")
+  
+  // Metadata
+  isActive              Boolean   @default(true)
+  isPublic              Boolean   @default(true)
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @db.Timestamptz
+  
+  @@index([tier])
+  @@index([isActive])
+  @@map("subscription_plans")
+}
+
+model ApiKey {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id])
+  
+  // Key details
+  name                  String
+  description           String    @default("")
+  keyHash               String    @unique
+  keyPrefix             String
+  
+  // Permissions
+  scopes                Json      @default([])
+  
+  // Status
+  isActive              Boolean   @default(true)
+  expiresAt             DateTime? @db.Timestamptz
+  lastUsedAt            DateTime? @db.Timestamptz
+  
+  // Metadata
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @db.Timestamptz
+  revokedAt             DateTime? @db.Timestamptz
+  
+  // Relations
+  usageLogs             ApiUsageLog[]
+  
+  @@index([organizationId])
+  @@index([keyHash])
+  @@index([userId])
+  @@map("api_keys")
+}
+
+model ApiUsageLog {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  apiKeyId              String
+  apiKey                ApiKey    @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  
+  // Request details
+  endpoint              String
+  method                String
+  statusCode            Int
+  durationMs            Int       @default(0)
+  
+  // Request metadata
+  ipAddress             String?
+  userAgent             String?
+  requestSizeBytes      Int?
+  responseSizeBytes     Int?
+  
+  // Metadata
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  
+  @@index([apiKeyId])
+  @@index([createdAt])
+  @@index([organizationId, createdAt])
+  @@map("api_usage_logs")
+}
+
+model AuditLog {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId                String?
+  user                  User?     @relation(fields: [userId], references: [id])
+  
+  // Action details
+  action                String
+  entityType            String
+  entityId              Int?
+  
+  // Changes
+  changes               Json?
+  oldValues             Json?
+  newValues             Json?
+  
+  // Context
+  ipAddress             String?
+  userAgent             String?
+  sessionId             String?
+  
+  // Metadata
+  metadata              Json?
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  
+  @@index([organizationId, createdAt])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model UsageMetric {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Metric details
+  metricType            String
+  value                 Float     @default(0.0)
+  unit                  String    @default("")
+  
+  // Period
+  periodStart           DateTime  @db.Timestamptz
+  periodEnd             DateTime  @db.Timestamptz
+  
+  // Metadata
+  metadata              Json?
+  recordedAt            DateTime  @default(now()) @db.Timestamptz
+  
+  @@index([organizationId, metricType])
+  @@index([recordedAt])
+  @@map("usage_metrics")
+}
+
+model FeatureFlag {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId           String?
+  
+  // Feature details
+  featureKey            String
+  enabled               Boolean   @default(false)
+  description           String    @default("")
+  
+  // Conditions
+  conditions            Json?
+  expiresAt             DateTime? @db.Timestamptz
+  
+  // Metadata
+  createdById           String?
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @db.Timestamptz
+  
+  @@unique([organizationId, workspaceId, featureKey])
+  @@index([organizationId, workspaceId])
+  @@map("feature_flags")
+}
+
+model Invitation {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId           String?
+  
+  // Invitation details
+  email                 String
+  token                 String    @unique
+  role                  MemberRole @default(MEMBER)
+  
+  // Status
+  status                String    @default("pending")
+  expiresAt             DateTime  @db.Timestamptz
+  acceptedAt            DateTime? @db.Timestamptz
+  
+  // Metadata
+  invitedById           String
+  createdAt              DateTime  @default(now()) @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @db.Timestamptz
+  
+  @@index([email])
+  @@index([token])
+  @@index([organizationId])
+  @@map("invitations")
+}
