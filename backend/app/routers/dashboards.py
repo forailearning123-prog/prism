@@ -59,6 +59,7 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
+DEFAULT_DRILL_BEHAVIOR = {"enabled": True, "breadcrumb": True}
 
 
 def utcnow() -> datetime:
@@ -374,7 +375,7 @@ async def _create_widgets_from_recommendations(
                 position_y=row * 3,
                 width=4,
                 height=3,
-                drill_behavior={"enabled": True, "breadcrumb": True},
+                drill_behavior=DEFAULT_DRILL_BEHAVIOR,
             )
         )
 
@@ -684,7 +685,7 @@ async def duplicate_dashboard(
                 legends=widget.legends,
                 labels=widget.labels,
                 tooltips=widget.tooltips,
-                drill_behavior=widget.drill_behavior,
+                drill_behavior=widget.drill_behavior if widget.drill_behavior is not None else DEFAULT_DRILL_BEHAVIOR,
                 config=widget.config,
                 position_x=widget.position_x,
                 position_y=widget.position_y,
@@ -890,7 +891,6 @@ async def restore_version(
     dashboard.creation_mode = DashboardCreationMode(snapshot.get("creation_mode", dashboard.creation_mode.value))
     dashboard.ai_prompt = snapshot.get("ai_prompt", dashboard.ai_prompt)
 
-    await db.execute(select(DashboardWidget).where(DashboardWidget.dashboard_id == dashboard.id).execution_options(synchronize_session="fetch"))
     for widget in list(dashboard.widgets):
         await db.delete(widget)
 
@@ -912,7 +912,11 @@ async def restore_version(
                 legends=widget_data.get("legends", {}),
                 labels=widget_data.get("labels", {}),
                 tooltips=widget_data.get("tooltips", {}),
-                drill_behavior=widget_data.get("drill_behavior", {}),
+                drill_behavior=(
+                    widget_data.get("drill_behavior")
+                    if widget_data.get("drill_behavior") is not None
+                    else DEFAULT_DRILL_BEHAVIOR
+                ),
                 config=widget_data.get("config", {}),
                 position_x=widget_data.get("position_x", 0),
                 position_y=widget_data.get("position_y", 0),

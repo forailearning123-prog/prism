@@ -59,7 +59,7 @@ export default function Dashboard() {
   const [notice, setNotice] = useState('')
 
   const [items, setItems] = useState([])
-  const [summary, setSummary] = useState({ total: 0, draft: 0, published: 0, archived: 0, favourites: 0 })
+  const [summary, setSummary] = useState({ total: 0, draft: 0, published: 0, archived: 0, favorites: 0 })
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const pageSize = 20
@@ -119,7 +119,13 @@ export default function Dashboard() {
       ])
       setItems(listRes.data.items || [])
       setTotal(listRes.data.total || 0)
-      setSummary(summaryRes.data)
+      setSummary({
+        total: summaryRes.data.total || 0,
+        draft: summaryRes.data.draft || 0,
+        published: summaryRes.data.published || 0,
+        archived: summaryRes.data.archived || 0,
+        favorites: summaryRes.data.favourites || summaryRes.data.favorites || 0,
+      })
       setSemanticModels(modelsRes.data.items || [])
 
       if (!activeDashboardId && (listRes.data.items || []).length) {
@@ -178,7 +184,8 @@ export default function Dashboard() {
     const handle = setTimeout(async () => {
       try {
         await api.post(`/api/v1/dashboards/${activeDashboard.id}/save-draft`, { note: 'Auto-saved by dashboard studio' })
-      } catch {
+      } catch (e) {
+        setNotice(`Auto-save failed: ${e.message}`)
       }
     }, 2500)
     return () => clearTimeout(handle)
@@ -293,7 +300,6 @@ export default function Dashboard() {
         height: 3,
         position_x: nextPositionX,
         position_y: nextPositionY,
-        drill_behavior: { enabled: true, breadcrumb: true },
       })
       const nextWidgets = [...widgets, { widget_type: widgetType, position_x: nextPositionX, position_y: nextPositionY }]
       pushHistory(nextWidgets)
@@ -556,7 +562,7 @@ export default function Dashboard() {
         <SummaryCard label="Draft" value={summary.draft} />
         <SummaryCard label="Published" value={summary.published} />
         <SummaryCard label="Archived" value={summary.archived} />
-        <SummaryCard label="Favourites" value={summary.favourites} />
+        <SummaryCard label="Favorites" value={summary.favorites} />
       </section>
 
       {notice && (
@@ -589,10 +595,10 @@ export default function Dashboard() {
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-400">Favourite</label>
+          <label className="text-xs text-gray-400">Favorite</label>
           <select className="mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm" value={favouriteFilter} onChange={(e) => setFavouriteFilter(e.target.value)}>
             <option value="">All</option>
-            <option value="true">Favourites</option>
+            <option value="true">Favorites</option>
             <option value="false">Non-favourites</option>
           </select>
         </div>
@@ -712,7 +718,7 @@ export default function Dashboard() {
                 <span>Updated: {formatDate(item.last_updated)}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                <button className="btn-secondary text-xs px-2 py-1" onClick={() => handleUpdateDashboardMeta({ is_favourite: !item.favourite })}>{item.favourite ? 'Unfavourite' : 'Favourite'}</button>
+                <button className="btn-secondary text-xs px-2 py-1" onClick={() => handleUpdateDashboardMeta({ is_favourite: !item.favourite })}>{item.favourite ? 'Unfavorite' : 'Favorite'}</button>
                 <button className="btn-secondary text-xs px-2 py-1" onClick={() => handleDuplicate(item)}>Duplicate</button>
                 <button className="btn-secondary text-xs px-2 py-1" onClick={() => handleArchive(item)}>Archive</button>
                 <button className="btn-secondary text-xs px-2 py-1" onClick={() => handleDelete(item)}>Delete</button>
@@ -849,7 +855,7 @@ export default function Dashboard() {
                         <div>
                           <p className="text-gray-200">{item.name}</p>
                           <p className="text-gray-400">{humanize(item.scope)} · {item.field} {item.operator}</p>
-                          <p className="text-gray-500">Drill path: Country → State → City → Branch, Year → Quarter → Month → Day</p>
+                          <p className="text-gray-500">Value: {JSON.stringify(item.value)}</p>
                         </div>
                         <button className="text-red-300 hover:text-red-200" onClick={() => removeFilter(item.id)}>Remove</button>
                       </div>

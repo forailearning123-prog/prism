@@ -584,7 +584,7 @@ class DashboardWidgetType(str, enum.Enum):
 
 
 class DashboardFilterScope(str, enum.Enum):
-    global_scope = "global"
+    global_ = "global"
     dashboard = "dashboard"
     widget = "widget"
     quick = "quick"
