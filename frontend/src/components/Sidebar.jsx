@@ -7,6 +7,7 @@ import {
   Settings,
   Zap,
   Database,
+  Layers,
 } from 'lucide-react'
 
 const nav = [
@@ -14,6 +15,7 @@ const nav = [
   { to: '/briefing', icon: Newspaper, label: 'Daily Briefing' },
   { to: '/executives', icon: Users, label: 'AI Executives' },
   { to: '/connections', icon: Database, label: 'Data Sources' },
+  { to: '/semantic-models', icon: Layers, label: 'Semantic Models' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 

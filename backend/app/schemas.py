@@ -28,6 +28,7 @@ class UserOut(BaseModel):
     email: str
     full_name: str
     company: str
+    role: str
     is_active: bool
     created_at: datetime
 
