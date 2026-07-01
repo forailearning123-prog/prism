@@ -7,7 +7,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set — run: openssl rand -hex 32}
       - DEBUG=${DEBUG:-false}
       - ALLOWED_ORIGINS=["http://localhost", "http://localhost:80", "${FRONTEND_URL:-http://localhost}"]
-      - DATABASE_URL=sqlite+aiosqlite:///./data/prism.db
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be set — e.g. postgresql+asyncpg://user:pass@ep-xxx.aws.neon.tech/neondb}
     volumes:
       - backend_data:/app/data
     ports:
