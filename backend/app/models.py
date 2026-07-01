@@ -75,6 +75,7 @@ class DataSource(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    name_normalized: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     source_type: Mapped[ConnectionType] = mapped_column(Enum(ConnectionType), index=True)
     status: Mapped[HealthStatus] = mapped_column(Enum(HealthStatus), default=HealthStatus.pending, index=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)

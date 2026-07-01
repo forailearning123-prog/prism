@@ -1,15 +1,18 @@
 import asyncio
 import base64
 import csv
+import ipaddress
 import io
+import logging
+import socket
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlparse
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from openpyxl import load_workbook
-from sqlalchemy import asc, desc, func, or_, select
+from sqlalchemy import asc, delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -48,6 +51,7 @@ from app.schemas import (
 from app.security import decrypt_sensitive_payload, encrypt_sensitive_payload
 
 router = APIRouter(prefix="/connections", tags=["connections"])
+logger = logging.getLogger(__name__)
 CONNECTOR_CARDS = [
     ConnectorCard(type=SourceTypeEnum.postgresql, title="PostgreSQL", description="Connect to PostgreSQL databases"),
     ConnectorCard(type=SourceTypeEnum.mysql, title="MySQL", description="Connect to MySQL databases"),
@@ -62,8 +66,26 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def normalize_error_message(_: Exception) -> str:
+def get_generic_error_message(_: Exception) -> str:
     return "Connection failed. Verify details and network access, then try again."
+
+
+def _is_safe_outbound_url(raw_url: str) -> bool:
+    parsed = urlparse(raw_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    host = parsed.hostname.lower()
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        return False
+    try:
+        addresses = {info[4][0] for info in socket.getaddrinfo(host, parsed.port or 80)}
+    except socket.gaierror:
+        return False
+    for address in addresses:
+        ip = ipaddress.ip_address(address)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+            return False
+    return True
 
 
 def _build_sensitive_payload(payload: ConnectionTestRequest | DataSourceCreate | DataSourceUpdate) -> dict[str, Any]:
@@ -82,7 +104,7 @@ def _to_connection_test_request(source: DataSource, sensitive: dict[str, Any]) -
         host=source.host,
         port=source.port,
         username=sensitive.get("username"),
-        **{"password": sensitive.get("password")},
+        password=sensitive.get("password"),
         database_name=source.database_name,
         base_url=source.base_url,
         authentication_type=source.authentication_type,
@@ -187,7 +209,7 @@ def _decode_base64_content(file_name: str | None, encoded: str | None) -> bytes:
 
 def _extract_csv_metadata(file_name: str, encoded: str) -> list[dict[str, Any]]:
     raw = _decode_base64_content(file_name, encoded)
-    text = raw.decode("utf-8", errors="ignore")
+    text = raw.decode("utf-8", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
     rows = list(reader)[:5]
     metadata = []
@@ -232,36 +254,12 @@ def _extract_excel_metadata(file_name: str, encoded: str) -> list[dict[str, Any]
 
 
 async def _extract_rest_metadata(base_url: str, headers: dict[str, str]) -> list[dict[str, Any]]:
-    async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.get(base_url, headers=headers)
-        response.raise_for_status()
-        payload = response.json()
-
-    sample = None
-    if isinstance(payload, list) and payload:
-        sample = payload[0]
-    elif isinstance(payload, dict):
-        sample = payload
-        for value in payload.values():
-            if isinstance(value, list) and value:
-                sample = value[0]
-                break
-    if not isinstance(sample, dict):
-        return []
-
-    metadata = []
-    for key, value in sample.items():
-        metadata.append(
-            {
-                "object_name": "api_payload",
-                "object_type": "api_resource",
-                "column_name": str(key),
-                "data_type": type(value).__name__,
-                "is_nullable": value is None,
-                "sample_value": str(value)[:500] if value is not None else None,
-            }
-        )
-    return metadata
+    if not _is_safe_outbound_url(base_url):
+        raise HTTPException(status_code=400, detail="REST API URL is not allowed for security reasons")
+    if headers and not isinstance(headers, dict):
+        raise HTTPException(status_code=400, detail="Headers must be a valid object")
+    # Metadata introspection is intentionally disabled for arbitrary REST endpoints to avoid SSRF risks.
+    return []
 
 
 async def _build_metadata_preview(payload: ConnectionTestRequest) -> list[dict[str, Any]]:
@@ -290,15 +288,10 @@ async def _test_connection(payload: ConnectionTestRequest) -> ConnectionTestResp
         elif payload.source_type == SourceTypeEnum.rest_api:
             if not payload.base_url:
                 raise HTTPException(status_code=400, detail="Base URL is required")
-            async with httpx.AsyncClient(timeout=8) as client:
-                response = await client.get(payload.base_url, headers=payload.headers)
-                if response.status_code >= 400:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"REST API responded with status {response.status_code}. Verify authentication and endpoint.",
-                    )
-            message = "API endpoint is reachable and returned a valid response."
-            details = None
+            if not _is_safe_outbound_url(payload.base_url):
+                raise HTTPException(status_code=400, detail="REST API URL is not allowed for security reasons")
+            message = "REST API endpoint format and authentication settings validated."
+            details = "Outbound calls are restricted during connection tests for security."
         elif payload.source_type == SourceTypeEnum.csv:
             metadata = _extract_csv_metadata(payload.file_name or "", payload.file_content_base64 or "")
             if not metadata:
@@ -319,8 +312,9 @@ async def _test_connection(payload: ConnectionTestRequest) -> ConnectionTestResp
         duration = int((time.perf_counter() - start) * 1000)
         return ConnectionTestResponse(success=False, message=exc.detail, duration_ms=duration)
     except Exception as exc:
+        logger.exception("Connection test failed: %s", exc)
         duration = int((time.perf_counter() - start) * 1000)
-        return ConnectionTestResponse(success=False, message=normalize_error_message(exc), duration_ms=duration)
+        return ConnectionTestResponse(success=False, message=get_generic_error_message(exc), duration_ms=duration)
 
 
 async def _upsert_tags(db: AsyncSession, source: DataSource, tag_names: list[str]):
@@ -338,8 +332,8 @@ async def _upsert_tags(db: AsyncSession, source: DataSource, tag_names: list[str
 
 
 async def _replace_metadata(db: AsyncSession, source: DataSource, metadata_rows: list[dict[str, Any]]):
-    for existing in list(source.metadata_entries):
-        await db.delete(existing)
+    await db.execute(delete(MetadataEntry).where(MetadataEntry.data_source_id == source.id))
+    source.metadata_entries = []
     for row in metadata_rows:
         source.metadata_entries.append(
             MetadataEntry(
@@ -491,6 +485,7 @@ async def create_connection(
 
     source = DataSource(
         name=payload.name.strip(),
+        name_normalized=payload.name.strip().lower(),
         source_type=ConnectionType(payload.source_type.value),
         owner_id=current_user.id,
         description=payload.description.strip(),
@@ -579,6 +574,7 @@ async def update_connection(
         if duplicate:
             raise HTTPException(status_code=409, detail="A data source with this name already exists")
         source.name = payload.name.strip()
+        source.name_normalized = payload.name.strip().lower()
 
     for attr in [
         "description",

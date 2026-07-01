@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
 import LoadingState from '../components/LoadingState'
@@ -12,7 +12,7 @@ export default function DataSourceDetails() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -27,11 +27,11 @@ export default function DataSourceDetails() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [sourceId])
 
   useEffect(() => {
     load()
-  }, [sourceId])
+  }, [load])
 
   if (loading) return <LoadingState count={4} height="h-40" />
   if (error) return <ErrorState message={error} />

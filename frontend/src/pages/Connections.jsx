@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import LoadingState from '../components/LoadingState'
@@ -62,7 +62,7 @@ export default function Connections() {
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -88,11 +88,11 @@ export default function Connections() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [search, statusFilter, typeFilter, sortBy, sortOrder, page, pageSize])
 
   useEffect(() => {
     loadData()
-  }, [search, statusFilter, typeFilter, sortBy, sortOrder, page])
+  }, [loadData])
 
   const openCreateWizard = () => {
     setWizardMode('create')
@@ -131,7 +131,7 @@ export default function Connections() {
     }
   }
 
-  const parsePayload = () => {
+  const parsePayload = useCallback(() => {
     const tags = form.tags
       .split(',')
       .map((t) => t.trim())
@@ -150,7 +150,7 @@ export default function Connections() {
       tags,
       headers,
     }
-  }
+  }, [form])
 
   const runTest = async () => {
     setTesting(true)
@@ -167,7 +167,7 @@ export default function Connections() {
     }
   }
 
-  const loadPreview = async () => {
+  const loadPreview = useCallback(async () => {
     try {
       const payload = parsePayload()
       const { data } = await api.post('/api/v1/connections/preview', payload)
@@ -175,13 +175,13 @@ export default function Connections() {
     } catch (e) {
       setPreviewData({ error: e.message })
     }
-  }
+  }, [parsePayload])
 
   useEffect(() => {
     if (showWizard && wizardStep === 4) {
       loadPreview()
     }
-  }, [wizardStep, showWizard])
+  }, [wizardStep, showWizard, loadPreview])
 
   const saveConnection = async () => {
     setSubmitting(true)
