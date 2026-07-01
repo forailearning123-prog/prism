@@ -397,7 +397,7 @@ export default function SemanticModels() {
 
             {wizardStep === 5 && (
               <section className="space-y-3">
-                <h3 className="font-medium">Step 4: Configure Business Model</h3>
+                <h3 className="font-medium">Step 5: Configure Business Model</h3>
                 <input
                   className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"
                   placeholder="Model Name"
@@ -421,7 +421,7 @@ export default function SemanticModels() {
 
             {wizardStep === 6 && (
               <section className="space-y-3">
-                <h3 className="font-medium">Step 5 & 6: Validate and Publish</h3>
+                <h3 className="font-medium">Step 6: Validate and Publish</h3>
                 <div className="card bg-gray-950 border border-gray-800">
                   {!validationIssues.length ? (
                     <p className="text-sm text-emerald-300">No validation issues found.</p>

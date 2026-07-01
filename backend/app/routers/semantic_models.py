@@ -1191,10 +1191,6 @@ async def delete_relationship(
     await db.commit()
 
 
-def _attach_basic_crud_endpoints():
-    return None
-
-
 for route_name, orm_model, create_schema, update_schema, output_schema in [
     ("dimensions", Dimension, DimensionCreate, DimensionUpdate, DimensionOut),
     ("measures", Measure, MeasureCreate, MeasureUpdate, MeasureOut),
