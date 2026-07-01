@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  connections Connection[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Connection {
+  id             String                 @id @default(uuid())
+  name           String
+  type           ConnectionType
+  status         ConnectionStatus       @default(ACTIVE)
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id])
+  credentials    ConnectionCredential[]
+  health         ConnectionHealth[]
+  history        ConnectionHistory[]
+  schedules      ConnectionSchedule[]
+  tags           ConnectionTag[]
+  isDeleted      Boolean                @default(false)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+}
+
+enum ConnectionType {
+  POSTGRESQL
+  MYSQL
+  SQL_SERVER
+  ORACLE
+  MONGODB
+  SNOWFLAKE
+  BIGQUERY
+  REST_API
+  CSV
+  EXCEL
+  JSON
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+model ConnectionCredential {
+  id             String     @id @default(uuid())
+  connectionId   String
+  connection     Connection @relation(fields: [connectionId], references: [id])
+  encryptedKey   String
+  encryptedValue String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model ConnectionHealth {
+  id               String     @id @default(uuid())
+  connectionId     String
+  connection       Connection @relation(fields: [connectionId], references: [id])
+  status           String
+  lastSuccess      DateTime?
+  lastFailure      DateTime?
+  latency          Int?
+  authErrors       Int        @default(0)
+  timeoutErrors    Int        @default(0)
+  isAvailable      Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+}
+
+model ConnectionHistory {
+  id           String     @id @default(uuid())
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id])
+  action       String
+  userId       String?
+  timestamp    DateTime   @default(now())
+}
+
+model ConnectionSchedule {
+  id           String     @id @default(uuid())
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id])
+  cron         String
+  isActive     Boolean    @default(true)
+}
+
+model ConnectionTag {
+  id           String     @id @default(uuid())
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id])
+  name         String
+}
